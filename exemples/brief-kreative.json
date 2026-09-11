@@ -1,0 +1,141 @@
+{
+  "_note": "Brief de Kreative pour elle-meme. Chiffres releves sur kreativeads.fr le 2026-09-08, sources dans aloa-production/clients/kreative/00-identite/source-site-2026-09-08.md. Aucun chiffre de performance publicitaire : le site n'en publie aucun. assets.logo reste null, le vectoriel n'a pas ete fourni.",
+  "marque": "Kreative",
+  "url_site": "https://kreativeads.fr",
+  "pack": "starter",
+  "verticale": "agence",
+  "produit": "un service productisé de créatives publicitaires pour Meta, vendu en packs à prix affiché et payé d'avance",
+  "cible": "les fondateurs de SaaS, les e-commerçants et les patrons d'agence qui achètent seuls",
+  "cta": "Voir les packs",
+  "promesse_courte": "vos créatives Meta livrées en 48 heures",
+  "douleurs": [
+    "l'attente de deux à quatre semaines chez une agence",
+    "le devis à mille euros pour une poignée de visuels",
+    "les trois à six heures par semaine passées à gérer les créatives",
+    "le budget qui interdit de tester plus d'une idée à la fois"
+  ],
+  "benefices": [
+    "vos visuels arrivent en 48 heures, prêts à diffuser",
+    "un formulaire de quinze minutes remplace le brief et la réunion de cadrage",
+    "vous testez vingt-quatre créatives quand une agence vous en donne une",
+    "vous êtes remboursé entièrement si rien ne vous convient après les révisions"
+  ],
+  "objections": [
+    "à vingt euros la créative, ça doit être fait par une IA",
+    "ça va ressembler à ce que tout le monde publie déjà",
+    "quarante-huit heures, c'est forcément bâclé",
+    "un brief de quinze minutes ne peut pas suffire pour ma marque"
+  ],
+  "causes": [
+    "le prix unitaire d'une créative, pas le budget média",
+    "le nombre d'idées que vous pouvez vous permettre de tester",
+    "le nombre d'allers-retours entre vous et le graphiste"
+  ],
+  "questions_cible": [
+    "combien coûte une créative publicitaire",
+    "comment produire des ads Meta rapidement",
+    "quelle agence pour des créatives Meta sans budget d'agence"
+  ],
+  "preuves": [
+    {
+      "type": "delai",
+      "valeur": "48",
+      "unite": "heures",
+      "source": "kreativeads.fr, releve 2026-09-08"
+    },
+    {
+      "type": "brief",
+      "valeur": "15",
+      "unite": "minutes",
+      "source": "kreativeads.fr, processus en 3 etapes"
+    },
+    {
+      "type": "note",
+      "valeur": "4,8",
+      "unite": "sur 5",
+      "source": "kreativeads.fr, bloc temoignages"
+    },
+    {
+      "type": "clients",
+      "valeur": "30",
+      "unite": "clients",
+      "source": "kreativeads.fr, bandeau de tete"
+    },
+    {
+      "type": "prix_unitaire",
+      "valeur": "20",
+      "unite": "euros par creative",
+      "source": "kreativeads.fr, pack Scale"
+    },
+    {
+      "type": "volume",
+      "valeur": "24",
+      "unite": "visuels",
+      "source": "kreativeads.fr, pack Scale"
+    }
+  ],
+  "offre": {
+    "prix": 180,
+    "devise": "EUR",
+    "mention": "le pack Starter, 6 visuels, tous les formats Meta"
+  },
+  "temoignages": [
+    "Les batchs sont toujours livrés dans les temps, avec très peu de retouches à prévoir",
+    "Au début je voulais juste tester avec une créative, deux mois après j'en avais commandé plus de vingt-cinq",
+    "J'ai testé plusieurs agences avant, eux se démarquent vraiment par la qualité et la rapidité"
+  ],
+  "metaphores": [
+    "un pressing : on dépose, on ne rencontre personne, on récupère à l'heure dite",
+    "une planche contact où douze marques ne se ressemblent pas"
+  ],
+  "decors": [
+    "un bureau de fondateur, table en bois sombre marquée par l'usage, ordinateur portable ouvert en arrière-plan, mur clair"
+  ],
+  "lumiere": "dure et directionnelle par une fenêtre latérale, ombres à bords nets",
+  "assets": {
+    "logo": "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-byXY9s56sXyS4wbJcnJLFDpVHs.png",
+    "packshots": [
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-3KVlgcOFpteVpc943nxsxN4Qdk.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-DwuAS25GqOCqO25sWd1mf2MCJY.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-1WVFJ4Y8ak5pAY2kTY1pQbeKN5Y.png"
+    ],
+    "captures": [
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-1WVFJ4Y8ak5pAY2kTY1pQbeKN5Y.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-3KVlgcOFpteVpc943nxsxN4Qdk.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-DwuAS25GqOCqO25sWd1mf2MCJY.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-KrS9o0QwHlBXxdX1g06gYiys2Cc.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-M4jFtVzCBlVz2INn9QxhnamaB4.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-OAEapAjQZCFeRR5TxUWbcdc8k.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-VLcEkTA9tQ5AywGlHGu4zETQ.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-gf6tKMOqG8ETaZr7tvMSitUO0I.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-iO4W5q1gmg0e6X7d8lXFqi12kLM.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-kBcpnNTCPaxcWfAchRl7wj0yrvQ.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-tPT2ksiXKWNACC50rTBy1ETRWEc.png",
+      "/Users/tomrubio/Desktop/aloa-production/clients/kreative/01-assets/portfolio-site/raw-x4BHZmJ4MSoK4A8RsaOT57LHQLI.png"
+    ]
+  },
+  "charte": {
+    "primaire": "#1F1F1F",
+    "accent": "#4D94FF",
+    "fond": "#F9F6F3",
+    "texte_sur_clair": "#1F1F1F"
+  },
+  "ton": "direct, factuel, pas de superlatif",
+  "_convention": "douleurs et causes = groupes nominaux. benefices = propositions completes. objections et temoignages = phrases citees.",
+  "contact": {
+    "email": "contact@kreativeads.fr",
+    "site": "kreativeads.fr"
+  },
+  "_charte_source": "Tokens CSS de kreativeads.fr, releve du 2026-09-08. Police du site : Inter. Gris de texte #B2B2B2 et #71717B. Non valides par le client : a confirmer avant livraison.",
+  "archetypes_exclus": [
+    "callouts_produit",
+    "sans_avec",
+    "avant_apres"
+  ],
+  "familles_prioritaires": [
+    "profondeur",
+    "preuve",
+    "emprunt"
+  ],
+  "_assets_note": "packshots = de vraies creatives Kreative. Le produit du client est la creative elle-meme, il n'existe pas d'objet a photographier."
+}

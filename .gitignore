@@ -1,0 +1,47 @@
+# Ce depot porte le SYSTEME, jamais les donnees.
+#
+# Motif : les dossiers de commande contiennent les nom, e-mail et telephone des
+# clients de Kreative, ainsi que les assets qui leur appartiennent. Le point 8
+# du cahier des charges impose par ailleurs l'execution locale, sans connecteur
+# SaaS. Ces donnees restent donc sur le poste, et rien ne les pousse ailleurs.
+#
+# Second motif, technique : git conserve chaque version de chaque binaire pour
+# toujours. Une crea regeneree trois fois, ce sont trois PNG dans l'historique
+# definitivement. Les images n'entrent pas ici.
+
+# Donnees clients : jamais versionnees
+commandes/
+
+# Instantane du back-office : regenerable, et derive des donnees clients
+backoffice/donnees.json
+backoffice/donnees.js
+
+# Corpus et references : volume, et droits des tiers
+corpus/
+inspirations/
+inspirations-sources/
+sources/CREA_INSPI.zip
+
+# Rendus de test : le texte reste, les images partent
+tests/**/*.png
+tests/**/*.jpg
+tests/**/*.jpeg
+tests/**/*.webp
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Sauvegardes de travail
+*.avant-*
+*.bak
+
+# macOS
+.DS_Store

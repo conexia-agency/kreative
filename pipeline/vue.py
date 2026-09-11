@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""vue.py : la page de suivi d'une commande.
+
+Une seule chose à faire, et elle doit être faite bien : mettre côte à côte le
+visuel et le prompt qui l'a produit. C'est ce qui manque quand on lance des
+générations en lot, et c'est ce qui permet de décider quoi corriger.
+
+Ce n'est pas un tableau de bord. Pas de graphique, pas de compteur décoratif :
+une ligne par créa, l'image à gauche, le prompt à droite, la commande de
+relance en dessous, prête à copier.
+
+La page est autonome : elle s'ouvre au double clic, sans serveur.
+
+Usage : python3 vue.py --marque "Aloa Design"
+"""
+from __future__ import annotations
+
+import argparse
+import html
+import sys
+from pathlib import Path
+
+import repertoire
+from etat import Commande, Crea
+
+
+def _bloc_crea(commande: Commande, crea: Crea) -> str:
+    ressort_cle, _, arch_cle = crea.angle.partition("/")
+    arch = repertoire.ARCHETYPES_PAR_CLE.get(arch_cle)
+    ressort = repertoire.RESSORTS_PAR_CLE.get(ressort_cle)
+
+    classe_visuel = "visuel"
+    if crea.master and (commande.dossier / crea.master).exists():
+        visuel = f'<img src="{html.escape(crea.master)}" loading="lazy" alt="{crea.identifiant}">'
+    elif crea.prompt.scene:
+        visuel = '<div class="vide">pas encore généré</div>'
+    else:
+        visuel = '<div class="vide compose">composé en HTML<br><span>aucune génération</span></div>'
+        classe_visuel = "visuel plat"
+
+    if crea.prompt.scene:
+        corps_prompt = f'<pre class="prompt">{html.escape(crea.prompt.rendu())}</pre>'
+        relance = (f'<code class="cmd">python3 kreative.py prompt '
+                   f'{html.escape(commande.donnees["ardoise"])} {crea.identifiant} --editer</code>'
+                   f'<code class="cmd">python3 kreative.py generer '
+                   f'{html.escape(commande.donnees["ardoise"])} --crea {crea.identifiant}</code>')
+    else:
+        corps_prompt = (f'<p class="sans">Archétype composé. Le visuel se fabrique en HTML à '
+                        f'partir des assets réels, aucun prompt n\'est envoyé à un modèle.</p>')
+        relance = ""
+
+    alerte = ""
+    if "[A COMPLETER:" in crea.copy.accroche + crea.copy.sous_accroche:
+        alerte = '<div class="alerte">Brief incomplet : cette créa contient un marqueur à compléter.</div>'
+
+    return f"""<article id="{crea.identifiant}">
+ <div class="{classe_visuel}">{visuel}</div>
+ <div class="fiche">
+  <header>
+    <b>{crea.identifiant}</b>
+    <span class="etat e-{html.escape(crea.etat)}">{html.escape(crea.etat)}</span>
+    <span class="fab {'gen' if crea.prompt.scene else 'comp'}">
+      {'génération' if crea.prompt.scene else 'composé'}</span>
+    {f'<span class="tours">{crea.tours} reprise(s)</span>' if crea.tours else ''}
+  </header>
+  {alerte}
+  <div class="c"><span class="k">archétype</span><span class="v">{html.escape(arch.nom if arch else arch_cle)}</span></div>
+  <div class="c"><span class="k">ressort</span><span class="v">{html.escape(ressort.nom if ressort else ressort_cle)}</span></div>
+  <div class="c"><span class="k">accroche</span><span class="v">{html.escape(crea.copy.accroche)}</span></div>
+  <div class="c"><span class="k">sous-accroche</span><span class="v">{html.escape(crea.copy.sous_accroche)}</span></div>
+  <div class="c"><span class="k">prompt</span><span class="v">{corps_prompt}{relance}</span></div>
+ </div></article>"""
+
+
+def construire(commande: Commande) -> str:
+    creas = commande.creas()
+    d = commande.donnees
+    a_generer = [x for x in creas if x.prompt.scene]
+    generes = [x for x in a_generer if x.master]
+
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{html.escape(d['marque'])}, suivi de production</title><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{background:#0f0e0d;color:#eae7e2;padding:28px 34px 70px;
+ font:13px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}}
+h1{{font-size:19px;font-weight:650;letter-spacing:-.02em}}
+.sous{{color:#8b857c;margin:6px 0 8px}}
+.jauge{{display:flex;gap:18px;margin:14px 0 26px;padding-bottom:20px;
+ border-bottom:1px solid #241f1b;flex-wrap:wrap}}
+.jauge div{{font-size:12px;color:#8b857c}}
+.jauge b{{display:block;font-size:22px;color:#eae7e2;font-weight:650}}
+article{{display:grid;grid-template-columns:250px 1fr;gap:22px;padding:18px 0;
+ border-bottom:1px solid #1c1917;align-items:start}}
+.visuel{{background:#000;border:1px solid #2a2521;border-radius:8px;overflow:hidden;
+ position:sticky;top:14px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center}}
+.visuel img{{width:100%;display:block}}
+.vide{{color:#5a534b;font-size:12px;text-align:center;padding:14px}}
+.visuel.plat{{aspect-ratio:auto;min-height:0;padding:20px 12px;background:#131110}}
+.vide.compose{{color:#4e7f5e}}
+.vide span{{color:#3d3831;font-size:11px}}
+header{{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:10px}}
+header b{{font-family:ui-monospace,Menlo,monospace;color:#f2b47a;font-size:14px}}
+.etat,.fab,.tours{{font-size:10.5px;padding:2px 7px;border-radius:4px;
+ text-transform:uppercase;letter-spacing:.05em}}
+.etat{{background:#241f1b;color:#a29a90}}
+.e-master_ok{{background:#17301f;color:#7ee0a0}}
+.e-composee{{background:#17301f;color:#7ee0a0}}
+.fab.gen{{background:#31240f;color:#f0b45f}}
+.fab.comp{{background:#14241a;color:#6fc98d}}
+.tours{{background:#2d1a1a;color:#e28b7a}}
+.alerte{{background:#2d1a1a;color:#e2604f;padding:7px 10px;border-radius:5px;
+ font-size:12px;margin-bottom:10px}}
+.c{{display:grid;grid-template-columns:120px 1fr;gap:14px;padding:6px 0;
+ border-bottom:1px solid #191614}}
+.c:last-child{{border:none}}
+.k{{color:#8b857c;font-size:11px;text-transform:uppercase;letter-spacing:.05em}}
+.v{{color:#d6d0c8}}
+.prompt{{background:#191614;border:1px solid #241f1b;border-radius:6px;padding:11px 13px;
+ font:11.5px/1.65 ui-monospace,Menlo,monospace;color:#c8bfae;white-space:pre-wrap;
+ max-height:230px;overflow:auto}}
+.sans{{color:#6fc98d;font-size:12px}}
+.cmd{{display:block;margin-top:7px;font:11px/1.6 ui-monospace,Menlo,monospace;
+ color:#8b857c;background:#141210;border:1px solid #241f1b;border-radius:5px;
+ padding:5px 9px;user-select:all}}
+@media(max-width:820px){{article{{grid-template-columns:1fr}}.visuel{{position:static;aspect-ratio:auto}}body{{padding:18px}}}}
+</style></head><body>
+<h1>{html.escape(d['marque'])}</h1>
+<div class="sous">pack {html.escape(d['pack'])} &middot;
+ {d['quantite_vendue']} vendues, {d['quantite_generee']} produites &middot;
+ verticale {html.escape(str(d.get('verticale', 'non définie')))}</div>
+<div class="jauge">
+ <div><b>{len(creas)}</b>créas au plan</div>
+ <div><b>{len(creas) - len(a_generer)}</b>composées, 0 crédit</div>
+ <div><b>{len(generes)}/{len(a_generer)}</b>générées</div>
+ <div><b>{len(a_generer) * 2}</b>crédits au total</div>
+</div>
+{"".join(_bloc_crea(commande, x) for x in creas)}
+</body></html>"""
+
+
+def ecrire(commande: Commande) -> Path:
+    chemin = commande.dossier / "suivi.html"
+    chemin.write_text(construire(commande), encoding="utf-8")
+    return chemin
+
+
+def main() -> int:
+    parseur = argparse.ArgumentParser(description="Page de suivi d'une commande")
+    parseur.add_argument("--marque", required=True)
+    arguments = parseur.parse_args()
+    try:
+        print(ecrire(Commande.charger(arguments.marque)))
+    except FileNotFoundError as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

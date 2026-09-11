@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kreative, chaîne de production</title>
+<style>
+  :root {
+    --fond: #0e0f12;
+    --panneau: #16181d;
+    --panneau-clair: #1d2027;
+    --bord: #262a33;
+    --encre: #e8eaef;
+    --encre-faible: #8f96a6;
+    --encre-tres-faible: #5d6474;
+    --accent: #4b7dff;
+    --vert: #35c17e;
+    --ambre: #e0a33a;
+    --rouge: #e2604f;
+    --violet: #a07df0;
+    --rayon: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--fond);
+    color: var(--encre);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ----- ossature ----- */
+
+  .entete {
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 22px; height: 56px;
+    border-bottom: 1px solid var(--bord);
+    background: var(--panneau);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .titre { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+  .titre span { color: var(--encre-tres-faible); font-weight: 400; }
+  .entete-fin { margin-left: auto; display: flex; align-items: center; gap: 14px;
+                color: var(--encre-tres-faible); font-size: 12px; }
+
+  .corps { display: grid; grid-template-columns: 264px 1fr; min-height: calc(100vh - 56px); }
+
+  .rail {
+    border-right: 1px solid var(--bord);
+    background: var(--panneau);
+    padding: 16px 12px;
+  }
+  .rail h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--encre-tres-faible); font-weight: 600; margin: 0 8px 10px;
+  }
+  .commande-item {
+    width: 100%; text-align: left; cursor: pointer;
+    background: transparent; border: 1px solid transparent; color: inherit;
+    border-radius: var(--rayon); padding: 11px 12px; margin-bottom: 4px;
+    font: inherit;
+  }
+  .commande-item:hover { background: var(--panneau-clair); }
+  .commande-item[aria-current="true"] { background: var(--panneau-clair); border-color: var(--bord); }
+  .commande-item .nom { font-weight: 600; display: block; }
+  .commande-item .meta { color: var(--encre-tres-faible); font-size: 12px; }
+
+  .principal { padding: 24px 28px 60px; min-width: 0; }
+
+  /* ----- bandeau commande ----- */
+
+  .bandeau { display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 22px; }
+  .bandeau h1 { font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+  .bandeau .site { color: var(--encre-tres-faible); font-size: 13px; margin-top: 2px; }
+  .puce {
+    display: inline-block; padding: 3px 9px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid var(--bord); color: var(--encre-faible);
+  }
+  .puce.demo { border-color: #4a3d1d; background: #2a2313; color: var(--ambre); }
+
+  .chiffres { display: flex; gap: 26px; margin-left: auto; }
+  .chiffre .valeur { font-size: 26px; font-weight: 650; letter-spacing: -.02em; line-height: 1.1; }
+  .chiffre .libelle { font-size: 11px; color: var(--encre-tres-faible);
+                      text-transform: uppercase; letter-spacing: .07em; }
+  .chiffre.alerte .valeur { color: var(--ambre); }
+
+  /* ----- chaîne d'étapes ----- */
+
+  .chaine { display: flex; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+  .etape {
+    flex: 1 1 0; min-width: 92px; padding: 9px 11px;
+    border: 1px solid var(--bord); border-radius: 8px;
+    background: var(--panneau); font-size: 12px; color: var(--encre-tres-faible);
+  }
+  .etape.faite { color: var(--encre-faible); border-color: #23402f; background: #14241c; }
+  .etape.courante { color: var(--encre); border-color: var(--accent); background: #16203c; font-weight: 600; }
+  .etape .rang { display: block; font-size: 10px; opacity: .55; }
+
+  /* ----- alerte ----- */
+
+  .alerte-bloc {
+    border: 1px solid #4a3d1d; background: #221d11; color: #f0d9a8;
+    border-radius: var(--rayon); padding: 13px 15px; margin-bottom: 22px; font-size: 13px;
+  }
+  .alerte-bloc strong { color: var(--ambre); }
+
+  /* ----- onglets ----- */
+
+  .onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--bord); margin-bottom: 20px; }
+  .onglet {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--encre-tres-faible); font: inherit; font-weight: 600; font-size: 13px;
+    padding: 9px 13px; cursor: pointer; margin-bottom: -1px;
+  }
+  .onglet[aria-selected="true"] { color: var(--encre); border-bottom-color: var(--accent); }
+  .onglet .compte { color: var(--encre-tres-faible); font-weight: 400; }
+
+  /* ----- grille de créas ----- */
+
+  .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 14px; }
+  .carte {
+    background: var(--panneau); border: 1px solid var(--bord); border-radius: var(--rayon);
+    overflow: hidden; cursor: pointer; text-align: left; color: inherit; font: inherit; padding: 0;
+    transition: border-color .12s ease;
+  }
+  .carte:hover { border-color: #3a4152; }
+  .carte .visuel { aspect-ratio: 4/5; background: #0a0b0e; position: relative; display: block; }
+  .carte .visuel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .carte .vide {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    color: var(--encre-tres-faible); font-size: 11px; text-align: center; padding: 12px;
+  }
+  .carte .pied { padding: 9px 11px 11px; }
+  .carte .ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .carte .ident { font-weight: 650; font-size: 12px; }
+  .carte .angle { color: var(--encre-tres-faible); font-size: 11px; margin-top: 3px;
+                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .etat {
+    font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+  }
+  .etat-prevue   { background: #202430; color: var(--encre-tres-faible); }
+  .etat-briefee  { background: #1e2a3d; color: #85a5d8; }
+  .etat-master_ok{ background: #2c2413; color: var(--ambre); }
+  .etat-composee { background: #1b2540; color: #8fa9f0; }
+  .etat-retenue  { background: #14301f; color: var(--vert); }
+  .etat-rejetee  { background: #331a17; color: var(--rouge); }
+
+  .badge-tours { font-size: 10px; color: var(--violet); font-weight: 600; }
+
+  /* ----- tiroir de détail ----- */
+
+  .voile {
+    position: fixed; inset: 0; background: rgba(6,7,9,.72);
+    display: none; z-index: 40;
+  }
+  .voile.ouvert { display: block; }
+  .tiroir {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(920px, 96vw);
+    background: var(--fond); border-left: 1px solid var(--bord);
+    z-index: 41; overflow-y: auto; display: none;
+  }
+  .tiroir.ouvert { display: block; }
+  .tiroir-entete {
+    position: sticky; top: 0; background: var(--panneau); border-bottom: 1px solid var(--bord);
+    padding: 16px 22px; display: flex; align-items: center; gap: 12px; z-index: 2;
+  }
+  .tiroir-entete h2 { font-size: 16px; font-weight: 650; }
+  .fermer {
+    margin-left: auto; background: none; border: 1px solid var(--bord); color: var(--encre-faible);
+    border-radius: 7px; width: 30px; height: 30px; cursor: pointer; font: inherit; font-size: 16px;
+    line-height: 1;
+  }
+  .fermer:hover { color: var(--encre); border-color: #3a4152; }
+  .tiroir-corps { padding: 22px; }
+
+  /* align-items: start, sinon la grille étire les trois cartes à la hauteur du
+     9:16 et laisse un grand vide sous le 1:1. Chaque format garde sa hauteur
+     réelle : c'est précisément ce qu'on veut donner à voir ici. */
+  .formats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+             margin-bottom: 26px; align-items: start; }
+  .format { border: 1px solid var(--bord); border-radius: var(--rayon); overflow: hidden;
+            background: var(--panneau); }
+  .format img { width: 100%; display: block; }
+  .format .etiquette {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; font-size: 11px; border-top: 1px solid var(--bord);
+  }
+  .format .ratio { font-weight: 700; letter-spacing: .04em; }
+  .verdict { font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; }
+  .verdict-CONFORME { background: #14301f; color: var(--vert); }
+  .verdict-ECHEC { background: #331a17; color: var(--rouge); }
+
+  .section { margin-bottom: 24px; }
+  .section h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--encre-tres-faible); font-weight: 600; margin-bottom: 10px;
+  }
+  .champ { display: grid; grid-template-columns: 130px 1fr; gap: 12px; padding: 8px 0;
+           border-bottom: 1px solid #1c1f26; }
+  .champ:last-child { border-bottom: none; }
+  .champ .cle { color: var(--encre-tres-faible); font-size: 12px; }
+  .champ .val { font-size: 13px; word-break: break-word; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+          color: var(--encre-faible); }
+
+  .echecs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .critere { font-size: 11px; padding: 2px 8px; border-radius: 6px;
+             background: #2a1815; color: #eb9384; border: 1px solid #4a2a24; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .bouton {
+    background: var(--panneau-clair); border: 1px solid var(--bord); color: var(--encre);
+    border-radius: 8px; padding: 10px 15px; font: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  .bouton:hover { border-color: #3a4152; }
+  .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .bouton.principal:hover { background: #3d6ded; }
+  .note-action { color: var(--encre-tres-faible); font-size: 12px; margin-top: 10px; }
+
+  .commande-shell {
+    margin-top: 10px; background: #0a0b0e; border: 1px solid var(--bord);
+    border-radius: 8px; padding: 11px 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    color: #9fb4d8; overflow-x: auto; white-space: pre;
+  }
+
+  /* ----- journal ----- */
+
+  .journal { border: 1px solid var(--bord); border-radius: var(--rayon); overflow: hidden; }
+  .journal-ligne {
+    display: grid; grid-template-columns: 92px 172px 1fr; gap: 14px;
+    padding: 9px 14px; border-bottom: 1px solid #1a1d24; font-size: 12.5px;
+  }
+  .journal-ligne:last-child { border-bottom: none; }
+  .journal-ligne:nth-child(odd) { background: #121419; }
+  .journal-ligne .heure { color: var(--encre-tres-faible);
+                          font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .journal-ligne .evenement { font-weight: 600; }
+  .journal-ligne .details { color: var(--encre-faible);
+                            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                            font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+
+  .vide-total { color: var(--encre-tres-faible); padding: 40px; text-align: center; }
+
+  @media (max-width: 900px) {
+    .corps { grid-template-columns: 1fr; }
+    .rail { border-right: none; border-bottom: 1px solid var(--bord); }
+    .formats { grid-template-columns: 1fr; }
+    .chiffres { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="entete">
+  <div class="titre">Kreative <span>/ chaîne de production</span></div>
+  <div class="entete-fin">
+    <span id="horodatage"></span>
+    <span id="mode"></span>
+  </div>
+</header>
+
+<div class="corps">
+  <nav class="rail">
+    <h2>Commandes</h2>
+    <div id="liste-commandes"></div>
+  </nav>
+  <main class="principal" id="principal"></main>
+</div>
+
+<div class="voile" id="voile"></div>
+<aside class="tiroir" id="tiroir" aria-label="Détail de la créa"></aside>
+
+<script src="donnees.js"></script>
+<script>
+"use strict";
+
+// Le back-office ne lit jamais les fichiers d'état : il lit l'instantané produit
+// par exporter.py. En local c'est donnees.js, servi par une balise script parce
+// que fetch est refusé en file://. Avec le serveur, ce sera /api/etat, même
+// structure, donc rien à changer ici.
+const ETATS_CHAINE = [
+  ["recue", "Paiement"],
+  ["intake", "Analyse du site"],
+  ["strategie", "Stratégie"],
+  ["generation", "Génération"],
+  ["composition", "Déclinaison"],
+  ["audit", "Audit"],
+  ["livree", "Livraison"],
+];
+
+const ORDRE_CREAS = ["retenue", "rejetee", "composee", "master_ok", "briefee", "prevue"];
+const LIBELLE_FORMAT = { "1x1": "1:1", "4x5": "4:5", "9x16": "9:16" };
+
+let etat = null;
+let indexCommande = 0;
+let ongletActif = "creas";
+
+function echapper(valeur) {
+  return String(valeur === null || valeur === undefined ? "" : valeur)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function heure(horodatage) {
+  if (!horodatage) return "";
+  const t = String(horodatage).split("T")[1] || "";
+  return t.slice(0, 8);
+}
+
+async function charger() {
+  // Mode serveur d'abord, repli sur l'instantané local. On ne tente le fetch
+  // que si le protocole peut aboutir : en file:// il échoue toujours, et la
+  // seule chose qu'il produirait est une erreur dans la console, exactement là
+  // où on ira chercher les vraies erreurs.
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    try {
+      const reponse = await fetch("/api/etat", { cache: "no-store" });
+      if (reponse.ok) {
+        document.getElementById("mode").textContent = "données en direct";
+        return await reponse.json();
+      }
+    } catch (erreur) { /* serveur absent, on retombe sur l'instantané */ }
+  }
+  document.getElementById("mode").textContent = "instantané local";
+  return window.DONNEES || null;
+}
+
+/* ----- rendu ----- */
+
+function rendreRail() {
+  const cible = document.getElementById("liste-commandes");
+  if (!etat || !etat.commandes.length) {
+    cible.innerHTML = '<div class="vide-total">Aucune commande</div>';
+    return;
+  }
+  cible.innerHTML = etat.commandes.map((commande, index) => `
+    <button class="commande-item" aria-current="${index === indexCommande}" data-index="${index}">
+      <span class="nom">${echapper(commande.marque)}</span>
+      <span class="meta">${echapper(commande.pack)} · ${commande.selection.retenues}/${commande.selection.a_livrer} retenues</span>
+    </button>`).join("");
+
+  cible.querySelectorAll(".commande-item").forEach((bouton) => {
+    bouton.addEventListener("click", () => {
+      indexCommande = Number(bouton.dataset.index);
+      rendre();
+    });
+  });
+}
+
+function rendreChaine(commande) {
+  const rang = ETATS_CHAINE.findIndex(([cle]) => cle === commande.etat);
+  return `<div class="chaine">${ETATS_CHAINE.map(([cle, libelle], index) => {
+    const classe = index < rang ? "faite" : index === rang ? "courante" : "";
+    return `<div class="etape ${classe}"><span class="rang">${index + 1}</span>${echapper(libelle)}</div>`;
+  }).join("")}</div>`;
+}
+
+function rendreAlerte(commande) {
+  if (commande.selection.suffisante) return "";
+  const manquantes = commande.selection.manquantes;
+  return `<div class="alerte-bloc">
+    <strong>Sélection insuffisante.</strong>
+    ${commande.selection.retenues} créa(s) retenue(s) pour ${commande.selection.a_livrer} à livrer,
+    il en manque ${manquantes}. Le doublement du volume existe pour absorber ça :
+    reprendre des créas rejetées, ou produire celles qui restent en attente.
+  </div>`;
+}
+
+function carteCrea(crea) {
+  const vignette = crea.vignettes && crea.vignettes["4x5"];
+  const visuel = vignette
+    ? `<img src="${vignette}" alt="Créa ${echapper(crea.identifiant)}" loading="lazy">`
+    : `<div class="vide">pas encore de visuel</div>`;
+  const tours = crea.tours > 0
+    ? `<span class="badge-tours">${crea.tours} reprise${crea.tours > 1 ? "s" : ""}</span>` : "";
+  return `<button class="carte" data-crea="${echapper(crea.identifiant)}">
+    <div class="visuel">${visuel}</div>
+    <div class="pied">
+      <div class="ligne">
+        <span class="ident">${echapper(crea.identifiant)}</span>
+        <span class="etat etat-${echapper(crea.etat)}">${echapper(crea.etat)}</span>
+      </div>
+      <div class="ligne"><div class="angle">${echapper(crea.angle) || "non briefée"}</div>${tours}</div>
+    </div>
+  </button>`;
+}
+
+function rendreJournal(commande) {
+  if (!commande.journal.length) return '<div class="vide-total">Journal vide</div>';
+  return `<div class="journal">${commande.journal.map((ligne) => {
+    const details = Object.entries(ligne)
+      .filter(([cle]) => cle !== "horodatage" && cle !== "evenement")
+      .map(([cle, valeur]) => `${cle}=${typeof valeur === "object" ? JSON.stringify(valeur) : valeur}`)
+      .join("  ");
+    return `<div class="journal-ligne">
+      <span class="heure">${echapper(heure(ligne.horodatage))}</span>
+      <span class="evenement">${echapper(ligne.evenement)}</span>
+      <span class="details">${echapper(details)}</span>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function rendre() {
+  rendreRail();
+  const principal = document.getElementById("principal");
+
+  if (!etat || !etat.commandes.length) {
+    principal.innerHTML = '<div class="vide-total">Aucune commande à afficher.</div>';
+    return;
+  }
+
+  const commande = etat.commandes[indexCommande];
+  document.getElementById("horodatage").textContent =
+    "instantané " + heure(etat.genere_le) + " UTC";
+
+  const creasTriees = commande.creas.slice().sort((a, b) => {
+    const ecart = ORDRE_CREAS.indexOf(a.etat) - ORDRE_CREAS.indexOf(b.etat);
+    return ecart !== 0 ? ecart : a.identifiant.localeCompare(b.identifiant);
+  });
+
+  principal.innerHTML = `
+    <div class="bandeau">
+      <div>
+        <h1>${echapper(commande.marque)}
+          ${commande.demonstration ? '<span class="puce demo">démonstration</span>' : ""}
+        </h1>
+        <div class="site">${echapper(commande.url_site)} · pack ${echapper(commande.pack)}
+          · ${commande.tours_revision_restants} tour(s) de révision restant(s)</div>
+      </div>
+      <div class="chiffres">
+        <div class="chiffre">
+          <div class="valeur">${commande.quantite_generee}</div>
+          <div class="libelle">générées</div>
+        </div>
+        <div class="chiffre">
+          <div class="valeur">${commande.quantite_vendue}</div>
+          <div class="libelle">vendues</div>
+        </div>
+        <div class="chiffre ${commande.selection.suffisante ? "" : "alerte"}">
+          <div class="valeur">${commande.selection.retenues}</div>
+          <div class="libelle">retenues</div>
+        </div>
+      </div>
+    </div>
+    ${rendreChaine(commande)}
+    ${rendreAlerte(commande)}
+    <div class="onglets">
+      <button class="onglet" role="tab" aria-selected="${ongletActif === "creas"}" data-onglet="creas">
+        Créas <span class="compte">${commande.creas.length}</span>
+      </button>
+      <button class="onglet" role="tab" aria-selected="${ongletActif === "journal"}" data-onglet="journal">
+        Journal <span class="compte">${commande.journal.length}</span>
+      </button>
+    </div>
+    ${ongletActif === "creas"
+      ? `<div class="grille">${creasTriees.map(carteCrea).join("")}</div>`
+      : rendreJournal(commande)}
+  `;
+
+  principal.querySelectorAll(".onglet").forEach((bouton) => {
+    bouton.addEventListener("click", () => { ongletActif = bouton.dataset.onglet; rendre(); });
+  });
+  principal.querySelectorAll(".carte").forEach((carte) => {
+    carte.addEventListener("click", () => ouvrirTiroir(commande, carte.dataset.crea));
+  });
+}
+
+/* ----- tiroir ----- */
+
+function ouvrirTiroir(commande, identifiant) {
+  const crea = commande.creas.find((c) => c.identifiant === identifiant);
+  if (!crea) return;
+
+  const formats = ["1x1", "4x5", "9x16"].map((format) => {
+    const vignette = crea.vignettes && crea.vignettes[format];
+    const bilan = crea.audit && crea.audit[format];
+    if (!vignette) return "";
+    return `<div class="format">
+      <img src="${vignette}" alt="${echapper(identifiant)} ${LIBELLE_FORMAT[format]}">
+      <div class="etiquette">
+        <span class="ratio">${LIBELLE_FORMAT[format]}</span>
+        ${bilan ? `<span class="verdict verdict-${echapper(bilan.verdict)}">${echapper(bilan.verdict)}</span>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  const echecs = [];
+  Object.entries(crea.audit || {}).forEach(([format, bilan]) => {
+    (bilan.criteres_en_echec || []).forEach((critere) => {
+      echecs.push(`${critere} (${LIBELLE_FORMAT[format]})`);
+    });
+  });
+
+  const ardoise = commande.ardoise;
+  const marque = commande.marque;
+
+  document.getElementById("tiroir").innerHTML = `
+    <div class="tiroir-entete">
+      <h2>${echapper(identifiant)}</h2>
+      <span class="etat etat-${echapper(crea.etat)}">${echapper(crea.etat)}</span>
+      ${crea.tours ? `<span class="badge-tours">${crea.tours} reprise(s)</span>` : ""}
+      <button class="fermer" id="fermer-tiroir" aria-label="Fermer">&times;</button>
+    </div>
+    <div class="tiroir-corps">
+      ${formats ? `<div class="formats">${formats}</div>` : ""}
+
+      ${echecs.length ? `<div class="section">
+        <h3>Critères en échec</h3>
+        <div class="echecs">${echecs.map((e) => `<span class="critere">${echapper(e)}</span>`).join("")}</div>
+        <div class="note-action">Les échecs se concentrent sur le 1:1 : c'est le cadre le plus
+        serré, donc celui où une accroche chevauche le sujet en premier. L'audit tourne sur les
+        trois rendus, pas sur le master.</div>
+      </div>` : ""}
+
+      <div class="section">
+        <h3>Copy</h3>
+        <div class="champ"><span class="cle">Angle</span><span class="val">${echapper(crea.angle)}</span></div>
+        <div class="champ"><span class="cle">Badge</span><span class="val">${echapper(crea.copy.badge)}</span></div>
+        <div class="champ"><span class="cle">Accroche</span><span class="val">${echapper(crea.copy.accroche)}</span></div>
+        <div class="champ"><span class="cle">Sous-accroche</span><span class="val">${echapper(crea.copy.sous_accroche)}</span></div>
+        <div class="champ"><span class="cle">CTA</span><span class="val">${echapper(crea.copy.cta)}</span></div>
+      </div>
+
+      <div class="section">
+        <h3>Prompt de scène</h3>
+        <div class="champ"><span class="cle">Scène</span><span class="val mono">${echapper(crea.prompt.scene)}</span></div>
+        <div class="champ"><span class="cle">Négatif</span><span class="val mono">${echapper(crea.prompt.negatif)}</span></div>
+        <div class="note-action">Le copy n'apparaît nulle part dans le prompt : le texte est posé
+        en CSS par le compositeur, jamais gravé par le modèle.</div>
+      </div>
+
+      <div class="section">
+        <h3>Reprises</h3>
+        <div class="actions">
+          <button class="bouton principal" data-reprise="visuel">Cas A, régénérer le visuel</button>
+          <button class="bouton" data-reprise="copy">Cas B, corriger le copy</button>
+        </div>
+        <div id="detail-reprise"></div>
+      </div>
+    </div>`;
+
+  document.getElementById("tiroir").classList.add("ouvert");
+  document.getElementById("voile").classList.add("ouvert");
+  document.getElementById("fermer-tiroir").addEventListener("click", fermerTiroir);
+
+  document.querySelectorAll("[data-reprise]").forEach((bouton) => {
+    bouton.addEventListener("click", () => {
+      const cas = bouton.dataset.reprise;
+      const cible = document.getElementById("detail-reprise");
+      // En prototype les actions ne sont pas branchées : le serveur n'existe pas
+      // encore. On montre la commande qui fait exactement ça aujourd'hui, elle
+      // est fonctionnelle.
+      if (cas === "visuel") {
+        cible.innerHTML = `<div class="note-action">Le master est effacé, l'angle, le copy et le
+          prompt sont conservés. La créa repart en génération sans repasser par la stratégie.</div>
+          <div class="commande-shell">python3 pipeline/etat.py reprise-visuel --marque "${echapper(marque)}" --crea ${echapper(identifiant)}</div>`;
+      } else {
+        cible.innerHTML = `<div class="note-action">Le master validé est conservé, seuls les champs
+          de copy fournis changent, et la créa repart en composition. Aucune génération n'est
+          relancée, donc coût nul et visuel qui ne peut pas dériver.</div>
+          <div class="commande-shell">python3 pipeline/etat.py reprise-copy --marque "${echapper(marque)}" --crea ${echapper(identifiant)} --accroche "votre nouvelle accroche"</div>`;
+      }
+    });
+  });
+}
+
+function fermerTiroir() {
+  document.getElementById("tiroir").classList.remove("ouvert");
+  document.getElementById("voile").classList.remove("ouvert");
+}
+
+document.getElementById("voile").addEventListener("click", fermerTiroir);
+document.addEventListener("keydown", (evenement) => {
+  if (evenement.key === "Escape") fermerTiroir();
+});
+
+charger().then((donnees) => { etat = donnees; rendre(); });
+</script>
+</body>
+</html>
