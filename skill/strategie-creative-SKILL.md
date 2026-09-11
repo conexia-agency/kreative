@@ -112,14 +112,71 @@ question** (l'image intrigue, le titre résout).
 
 ---
 
-## 5. Les deux moteurs Higgsfield
+## 5. Les trois portes Higgsfield, et qui fait quoi
 
-C'est le coeur de cette version. Relevé mesuré le 08/09, revérifié le 11/09 par
+Higgsfield s'atteint par trois chemins. Ils ne sont pas équivalents, et les
+confondre est la meilleure façon de produire un pipeline qui marche en démonstration
+et casse en production. Relevé du 11/09.
+
+| | API REST | CLI | MCP |
+|---|---|---|---|
+| adresse | `api.higgsfield.ai` | binaire `higgsfield` 1.1.23 | connecteur claude.ai |
+| authentification | clé serveur `Authorization: Key <id>:<secret>`, créée sur cloud.higgsfield.ai | OAuth, session locale | OAuth navigateur, session Claude |
+| sans humain | **oui** | oui | **non** |
+| modèles image | à vérifier | **30**, dont Nano Banana Pro | 9, **sans Nano Banana** |
+| 42 gabarits d'annonce | à vérifier | **oui**, `marketing-studio ad-formats` | non |
+| estimation avant dépense | oui, endpoint dédié | oui, `generate cost` et `--cost-only` | non vue |
+| mode | asynchrone, polling ou webhook | synchrone avec `--wait` | appel d'agent |
+
+**Répartition retenue.**
+
+1. **L'API REST est la porte de production.** C'est la seule conçue pour un serveur :
+   clé serveur, cycle asynchrone, rappel par webhook, aucun navigateur, aucun binaire
+   à installer chez le client. C'est elle qui satisfait le point 8 du cahier des
+   charges.
+2. **La CLI est l'outillage et le repli.** Elle porte le catalogue le plus complet et
+   les 42 gabarits d'annonce. Elle sert à estimer un coût, inspecter le catalogue,
+   tester une créa à la main, et elle prend le relais si l'API n'expose pas les
+   gabarits.
+3. **Le MCP est l'atelier, jamais le pipeline.** Exploration interactive, tri,
+   Marketing Studio v2 et ses 986 presets de style produit. Il exige une session
+   Claude authentifiée, donc il ne peut pas tenir une production sans personne.
+
+Deux points restent à vérifier dès qu'une clé serveur existe : **quels modèles l'API
+expose** (notamment Nano Banana Pro et les gabarits DTC), et **si ses crédits sont
+ceux du plan ultra ou une facturation séparée**. La documentation ne le dit pas.
+Tant que ce n'est pas tranché, la CLI reste la porte de production par défaut.
+
+**Contrainte de rétention, valable sur les trois portes :** un fichier généré reste
+accessible au moins sept jours, puis peut disparaître. Le pipeline télécharge donc
+chaque rendu immédiatement, il ne garde jamais une simple URL.
+
+## 5 bis. Les moteurs, et leur coût réel
+
+Coûts relevés le 11/09 par `higgsfield generate cost` et `dtc-ads --cost-only`.
+
+| Moteur | Identifiant | Coût |
+|---|---|---:|
+| MS Image, basse qualité 2k | `dtc-ads --quality low --resolution 2k` | **0,75** |
+| Nano Banana 2 Lite | `nano_banana_2_lite` | 1 |
+| Recraft V4.1 | `recraft_v4_1` | 1,25 |
+| GPT Image 2.5 | `gpt_image_2_5` | 1,5 |
+| Nano Banana 2 | `nano_banana_flash` | 1,5 |
+| Nano Banana Pro | `nano_banana_pro` | 2 |
+| MS Image, haute qualité 2k | `dtc-ads --quality high --resolution 2k` | **7** |
+
+**Piège d'identifiant.** `nano_banana_2` n'existe pas au catalogue : c'est un alias
+accepté qui coûte 2 crédits, comme `nano_banana_pro`. Mais le modèle qui s'affiche
+« Nano Banana 2 » est `nano_banana_flash`, à 1,5 crédit, et ce n'est pas le Pro.
+Écrire l'identifiant explicite `nano_banana_pro` évite de croire qu'on tient le Pro
+alors qu'on a autre chose.
+
+Relevé mesuré le 08/09, revérifié le 11/09 par
 `higgsfield generate cost` et `dtc-ads generate --cost-only`.
 
 |  | MS Image (Marketing Studio) | Nano Banana Pro |
 |---|---|---|
-| commande | `higgsfield marketing-studio dtc-ads generate` | `higgsfield generate create nano_banana_2` |
+| commande | `higgsfield marketing-studio dtc-ads generate` | `higgsfield generate create nano_banana_pro` |
 | coût | low 1k 0,5 · **low 2k 0,75** · high 1k 4 · **high 2k 7** | **2** en texte vers image, **4** en image vers image |
 | réglage qualité | low / medium / high | aucun |
 | résolution | 1k / 2k / 4k (défaut 1k) | 1k / 2k / 4k (défaut 2k) |
@@ -263,7 +320,7 @@ charge et sur-spécifier le bride.
 ### Sur Nano Banana Pro
 
 ```
-higgsfield generate create nano_banana_2 \
+higgsfield generate create nano_banana_pro \
   --prompt "<1800 a 2400 caracteres>" \
   --aspect-ratio 9:16
 ```
@@ -411,8 +468,8 @@ Six écarts corrigés, tous documentés ci-dessus.
 6. **Moteur unique Nano Banana Pro** : MS Image compose mieux pour 0,75 crédit contre
    2. Routage à deux moteurs, section 5.
 
-**Note d'exécution.** La génération passe par la CLI Higgsfield et non par le serveur
-MCP, contrairement à l'usage interne décidé le 10/09. Motif : le MCP exige une
-authentification par navigateur, incompatible avec le fonctionnement sans
-intervention humaine exigé par le point 8 du cahier des charges. La CLI est la seule
-porte utilisable sans personne devant l'écran.
+**Note d'exécution.** Les trois portes servent, chacune à sa place : API REST en
+production, CLI en outillage et en repli, MCP en atelier interactif. Le détail est en
+section 5. Le MCP ne peut pas tenir le pipeline, non par préférence mais parce qu'il
+exige une session Claude authentifiée et n'expose ni Nano Banana ni les 42 gabarits
+d'annonce.
