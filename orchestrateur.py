@@ -8,8 +8,15 @@
 Un cycle enchaîne les maillons dans l'ordre, sur toutes les commandes concernées :
 
 1. **relevé** : les nouvelles soumissions Zite deviennent des commandes (`zite.py`) ;
-2. **rédaction** : les réponses brutes deviennent un brief moteur (`redaction.py`) ;
-3. **stratégie** : le brief devient un plan de créas (`strategie.py`).
+2. **site** : le site du client est aspiré, assets, captures et charte mesurée
+   (`scraper.py`, point 4.1 du cahier des charges) ;
+3. **rédaction** : les réponses brutes deviennent un brief moteur (`redaction.py`) ;
+4. **stratégie** : le brief devient un plan de créas (`strategie.py`).
+
+**Un site illisible n'arrête pas la commande.** On n'écrit alors aucune charte,
+parce qu'une charte tirée d'une page de garde est plausible et fausse. La chaîne
+continue sur le seul brief, qui a la priorité absolue au 4.5, et les créas privées
+d'asset le disent au lieu de l'inventer.
 
 **Le cycle s'arrête avant la génération.** C'est voulu. Générer dépense des
 crédits, et le dernier pack produit sans regard humain, le 08/09, est parti entier
@@ -41,6 +48,7 @@ RACINE = Path(__file__).resolve().parent
 sys.path.insert(0, str(RACINE / "pipeline"))
 
 import redaction  # noqa: E402
+import scraper  # noqa: E402
 import strategie  # noqa: E402
 import zite  # noqa: E402
 from etat import RACINE_DEFAUT, Commande  # noqa: E402
@@ -100,8 +108,78 @@ def _echouer(commande: Commande, etape: str, erreur: Exception) -> None:
     _journal("echec", commande=commande.dossier.name, etape=etape, erreur=str(erreur)[:160])
 
 
-def cycle(generer: bool = False, limite: int = 0) -> dict:
-    bilan = {"ouvertes": 0, "redigees": 0, "planifiees": 0, "echecs": 0, "en_attente_generation": 0}
+def _aspirer(commande: Commande, pages: int) -> str:
+    """Aspire le site du client. Rend l'issue, sans jamais lever.
+
+    Trois issues, et la distinction compte.
+
+    `aspire` : le site a été lu, la charte mesurée et les assets rangés.
+
+    `inexploitable` : le site est derrière un mur, en construction ou vide. On
+    n'écrit AUCUNE charte, parce qu'une charte tirée d'une page de garde est
+    plausible et fausse, et qu'elle contaminerait le pack entier. La commande
+    continue quand même sur le seul brief : le 4.5 du cahier des charges donne
+    la priorité absolue au brief, et un site illisible n'est pas un brief vide.
+    Les créas qui réclamaient un asset du site afficheront « ASSET MANQUANT »,
+    ce que le compositeur sait déjà faire et que le gate relève.
+
+    `sans_url` : le formulaire n'a pas donné d'adresse. Rien à aspirer.
+    """
+    url = (commande.donnees.get("url_site")
+           or (commande.donnees.get("brief") or {}).get("url_site"))
+    nom = commande.dossier.name
+    issue, details = "sans_url", {}
+
+    if url:
+        try:
+            resultat = scraper.aspirer_commande(nom, pages)
+            issue = "aspire"
+            details = {k: resultat.get(k) for k in ("pages", "images", "logos")}
+        except scraper.SiteInexploitable as erreur:
+            issue = "inexploitable"
+            details = {"raison": str(erreur).split("\n")[0][:300]}
+        except Exception as erreur:  # panne de navigateur, réseau, page morte
+            issue = "echec"
+            details = {"erreur": str(erreur)[:300]}
+            commande.tracer("echec_scraping", erreur=str(erreur)[:500])
+
+    _marqueur(commande).write_text(json.dumps(
+        {"issue": issue, "url": url, "horodatage": _maintenant(), **details},
+        ensure_ascii=False, indent=1), encoding="utf-8")
+    _journal(f"site_{issue}", commande=nom, **details)
+    return issue
+
+
+def _marqueur(commande: Commande) -> Path:
+    chemin = commande.dossier / "marque" / "scraping.json"
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    return chemin
+
+
+def _site_a_traiter(commande: Commande) -> bool:
+    """Faut-il aspirer le site de cette commande maintenant ?
+
+    Une panne se retente, un refus non. Un navigateur qui tombe ou un réseau
+    coupé sont des accidents ; un site derrière un mot de passe ne se déverrouille
+    pas tout seul, et le reprendre à chaque cycle ferait tourner Chromium toutes
+    les cinq minutes pour le même échec, jusqu'à ce que plus personne ne lise le
+    journal.
+    """
+    marqueur = _marqueur(commande)
+    if marqueur.exists():
+        try:
+            return json.loads(marqueur.read_text(encoding="utf-8")).get("issue") == "echec"
+        except json.JSONDecodeError:
+            return True
+    # Pas de marqueur, mais une charte mesurée sur le disque : quelqu'un a lancé
+    # `scraper.py aspirer` à la main. On ne refait pas cinquante secondes de
+    # navigateur pour reproduire ce qui est déjà là.
+    return not (commande.dossier / "marque" / "charte-site.json").exists()
+
+
+def cycle(generer: bool = False, limite: int = 0, pages: int = 25) -> dict:
+    bilan = {"ouvertes": 0, "aspirees": 0, "sites_refuses": 0, "redigees": 0,
+             "planifiees": 0, "echecs": 0, "en_attente_generation": 0}
 
     try:
         releve = zite.relever(appliquer=True)
@@ -116,6 +194,17 @@ def cycle(generer: bool = False, limite: int = 0) -> dict:
         nom = commande.dossier.name
         etat = commande.donnees.get("etat")
         brief = commande.donnees.get("brief") or {}
+
+        # Le site d'abord. Les assets et la charte mesurée doivent exister sur le
+        # disque avant que le brief se construise, sinon la rédaction travaille
+        # sur un dossier vide et les créas réclameront des assets qu'on avait.
+        if etat == "recue" and _site_a_traiter(commande):
+            issue = _aspirer(commande, pages)
+            if issue == "aspire":
+                bilan["aspirees"] += 1
+            elif issue in ("inexploitable", "sans_url"):
+                bilan["sites_refuses"] += 1
+            commande = Commande.charger(nom)
 
         if etat == "recue" and not brief.get("_redige"):
             if redactions_restantes <= 0:
@@ -160,14 +249,21 @@ def etat() -> int:
     if not commandes:
         print("Aucune commande issue de Zite.")
         return 0
-    print(f"{'commande':<22} {'pack':<8} {'etat':<12} {'redige':<7} {'creas':>5}  a completer")
+    print(f"{'commande':<22} {'pack':<8} {'etat':<12} {'site':<14} {'redige':<7} "
+          f"{'creas':>5}  a completer")
     for c in commandes:
         b = c.donnees.get("brief") or {}
         nb = len(list((c.dossier / "creas").glob("*.json")))
         manque = len(b.get("a_completer") or [])
+        marqueur = _marqueur(c)
+        try:
+            site = json.loads(marqueur.read_text(encoding="utf-8"))["issue"] \
+                if marqueur.exists() else "a faire"
+        except (json.JSONDecodeError, KeyError):
+            site = "illisible"
         print(f"{c.dossier.name[:22]:<22} {c.donnees.get('pack',''):<8} "
-              f"{c.donnees.get('etat',''):<12} {'oui' if b.get('_redige') else 'non':<7} "
-              f"{nb:>5}  {manque}")
+              f"{c.donnees.get('etat',''):<12} {site:<14} "
+              f"{'oui' if b.get('_redige') else 'non':<7} {nb:>5}  {manque}")
     return 0
 
 
@@ -179,6 +275,8 @@ def main() -> int:
     p_tourner.add_argument("--intervalle", type=int, default=300, help="secondes entre deux cycles")
     p_tourner.add_argument("--limite", type=int, default=0,
                            help="nombre maximal de redactions par cycle, 0 pour aucune limite")
+    p_tourner.add_argument("--pages", type=int, default=25,
+                           help="nombre maximal de pages aspirees par site")
     p_tourner.add_argument("--generer", action="store_true",
                            help="lever le verrou de generation (non branche a ce jour)")
     sous.add_parser("etat")
@@ -197,7 +295,7 @@ def main() -> int:
         else:
             try:
                 _journal("cycle_demarre", generer=args.generer)
-                cycle(generer=args.generer, limite=args.limite)
+                cycle(generer=args.generer, limite=args.limite, pages=args.pages)
             finally:
                 _rendre_verrou()
         if args.une_fois:
