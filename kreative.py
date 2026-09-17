@@ -165,10 +165,17 @@ def commande_prompts(marque: str, brut: bool) -> int:
         ], ensure_ascii=False, indent=1))
         return 0
 
+    import couts
+
     a_generer = [x for x in creas if x.prompt.scene]
+    bilan = couts.devis([{"modele": x.prompt.modele,
+                          "references": len(x.prompt.references or [])}
+                         for x in a_generer])
+    chiffre = (f"{bilan['total']} crédits" if bilan["complet"]
+               else f"au moins {bilan['total']} crédits, certains modèles non mesurés")
     print(f"{commande.donnees['marque']} : {len(creas)} créas, "
           f"{len(creas) - len(a_generer)} composées, {len(a_generer)} à générer "
-          f"({len(a_generer) * 2} crédits).\n")
+          f"({chiffre}).\n")
 
     for crea in creas:
         ressort, arch = (crea.angle.split("/") + [""])[:2]
@@ -245,14 +252,17 @@ def commande_prompt(marque: str, identifiant: str, editer: bool,
 # ---------------------------------------------------------------------------
 
 def commande_generer(marque: str, creas: Optional[List[str]], estimer: bool) -> int:
-    # L'import est tardif : il tire la CLI Higgsfield et le module aloa, qui
-    # ne doivent pas être exigés pour simplement lire un plan.
-    import generation
+    """Chiffre, puis prépare le lot que la session de génération consommera.
+
+    Cette commande ne génère pas. Le connecteur MCP Higgsfield n'existe que dans
+    une session Claude : elle écrit donc le lot, et la session l'exécute après
+    un GO. Le découpage vit dans `pipeline/moteur.py`.
+    """
+    import couts
+    import moteur
 
     commande = Commande.charger(marque)
-    attendus = [x for x in commande.creas() if x.etat == "briefee" and x.prompt.scene]
-    if creas:
-        attendus = [x for x in attendus if x.identifiant in set(creas)]
+    attendus = moteur.a_generer(commande, creas)
 
     if not attendus:
         composees = [x for x in commande.creas() if not x.prompt.scene]
@@ -262,14 +272,24 @@ def commande_generer(marque: str, creas: Optional[List[str]], estimer: bool) -> 
         return 0
 
     if estimer:
-        print(f"{len(attendus)} créa(s) à générer, environ {len(attendus) * 2} crédits.")
+        # Le chiffrage vient de la table mesurée, plus d'un « fois deux » posé en
+        # dur : tous les modèles ne coûtent pas le même prix, et un devis faux
+        # autorise une dépense sur une base fausse.
+        bilan = couts.devis([{"modele": x.prompt.modele,
+                              "references": len(x.prompt.references or [])}
+                             for x in attendus])
         for x in attendus:
-            print(f"  {x.identifiant}  {x.copy.accroche[:70]}")
+            print(f"  {x.identifiant}  {x.prompt.modele:<18} {x.copy.accroche[:52]}")
+        print()
+        print(couts.rapport(bilan, plafond=moteur.PLAFOND_CREDITS_DEFAUT))
         return 0
 
-    print(f"{len(attendus)} créa(s) à générer.")
-    generation.generer(commande, [x.identifiant for x in attendus])
-    return 0
+    lot = moteur.preparer(commande, creas)
+    print(moteur.rapport_lot(lot))
+    print(f"\nLot écrit : {lot['_fichier']}")
+    print("Pour générer : ouvrir une session Claude Code, lire ce lot, "
+          "confirmer le devis, puis appeler le MCP Higgsfield.")
+    return 2 if lot["au_dessus_du_plafond"] or not lot["devis"]["complet"] else 0
 
 
 # ---------------------------------------------------------------------------

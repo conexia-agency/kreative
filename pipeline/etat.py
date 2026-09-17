@@ -135,7 +135,18 @@ class Prompt:
     scene: str = ""
     negatif: str = ""
     phrase_gravee: str = ""
-    modele: str = "nano_banana_2"  # affiché "Nano Banana Pro"
+    # `nano_banana_pro` en toutes lettres, pas l'alias. Sous l'ancienne ligne de
+    # commande, `nano_banana_2` passait pour le Pro, et le modèle qui s'affiche
+    # « Nano Banana 2 » est en réalité `nano_banana_flash`, moins cher et moins
+    # bon. Le connecteur MCP expose les trois séparément : on nomme celui du
+    # cahier des charges.
+    modele: str = "nano_banana_pro"
+    # Images de référence pour l'image-to-image, chemins relatifs à la commande.
+    # C'est par là que le vrai produit entre dans une scène sans être redessiné :
+    # le test du 27/08 a montré que le modèle préserve un grand texte 4 fois sur
+    # 4, mais redessine un logo 0 fois sur 4. Un produit qui porte une marque ne
+    # se génère donc jamais, il se compose ou se passe en référence.
+    references: List[str] = field(default_factory=list)
 
     def rendu(self) -> str:
         texte = self.scene
