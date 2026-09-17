@@ -134,14 +134,23 @@ def preparer(commande: Commande, filtre: Optional[List[str]] = None,
         "jobs": jobs,
         # Ce bloc est lu par la session qui génère. Il ne décore pas le fichier,
         # il porte les règles que le lot ne doit pas laisser oublier.
+        # Ce bloc est lu par la session qui génère, et il fait foi. Il a été
+        # réécrit le 17/09 : il portait encore les règles de la chaîne composée
+        # (master 9:16, texte jamais gravé) alors que les prompts cuisent le
+        # texte en 1:1. Une session y aurait lu deux ordres contraires.
         "consignes": [
-            "Un master par créa, toujours en 9:16. Les trois formats en sont "
-            "tirés ensuite sans nouvel appel : générer trois fois donnerait trois "
-            "images différentes et violerait la règle 4.2 du cahier des charges.",
-            "Le texte marketing ne se grave jamais. Il est posé en CSS par le "
-            "compositeur, après.",
-            "Un produit qui porte une marque ou une étiquette ne se génère pas. "
-            "Il se détoure et se compose, ou il passe en référence i2i.",
+            "Le texte EST peint par le modèle, c'est la décision du 17/09. Le "
+            "prompt porte la copy exacte à afficher, et le master 1:1 est le "
+            "livrable : il ne se recadre pas et ne se décline pas.",
+            "Le prompt part au modèle sans qu'un caractère soit ajouté. Ne rien "
+            "compléter, ne rien reformuler, ne rien traduire.",
+            "Un produit ou un logo qui porte une marque ne se génère jamais. Il "
+            "passe en référence i2i, avec la formule anti-régénération déjà "
+            "écrite dans le prompt.",
+            "Télécharger chaque image produite sur le disque avant de la ranger : "
+            "les rendus Higgsfield disparaissent au bout de sept jours.",
+            "Relever le solde avant et après le lot, et le passer à `recolter` : "
+            "c'est ce qui calibre la table de coûts.",
             "Afficher le devis et attendre un GO explicite avant le premier appel.",
         ],
     }

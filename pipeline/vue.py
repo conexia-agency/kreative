@@ -19,9 +19,24 @@ import argparse
 import html
 import sys
 from pathlib import Path
+from typing import List
 
 import repertoire
 from etat import Commande, Crea
+
+
+def _credits(creas: List[Crea]) -> str:
+    """Le coût du lot, tiré de la table mesurée et non d'un « fois deux ».
+
+    L'ancienne version comptait deux crédits par créa. C'est faux dès qu'un
+    asset est joint : Nano Banana Pro passe alors de 2 à 4. Sur le pack Podmax,
+    treize créas sur dix-huit sont en image vers image, et la page annonçait 36
+    crédits pour une dépense réelle de 62.
+    """
+    import couts
+    bilan = couts.devis([{"modele": c.prompt.modele,
+                          "references": len(c.prompt.references or [])} for c in creas])
+    return f"{bilan['total']:g}" if bilan["complet"] else f"{bilan['total']:g}+"
 
 
 def _bloc_crea(commande: Commande, crea: Crea) -> str:
@@ -33,7 +48,27 @@ def _bloc_crea(commande: Commande, crea: Crea) -> str:
     if crea.master and (commande.dossier / crea.master).exists():
         visuel = f'<img src="{html.escape(crea.master)}" loading="lazy" alt="{crea.identifiant}">'
     elif crea.prompt.scene:
-        visuel = '<div class="vide">pas encore généré</div>'
+        # Avant génération, cet emplacement affichait « pas encore généré », donc
+        # du vide. Or c'est exactement là qu'il faut montrer la MATIERE RETENUE :
+        # avant de dépenser des crédits, ce qu'on doit pouvoir juger d'un coup
+        # d'oeil, c'est quels assets réels du client entrent dans quelle créa.
+        # Un chemin qui ne résout pas se voit ici, pas à la génération.
+        vignettes = []
+        for chemin in (crea.prompt.references or []):
+            existe = (commande.dossier / chemin).exists()
+            if existe:
+                vignettes.append(f'<img src="{html.escape(chemin)}" loading="lazy" '
+                                 f'title="{html.escape(chemin)}" alt="">')
+            else:
+                vignettes.append(f'<span class="absent" title="{html.escape(chemin)}">'
+                                 f'asset introuvable</span>')
+        if vignettes:
+            visuel = (f'<div class="matiere"><div class="grille">{"".join(vignettes)}</div>'
+                      f'<span class="legende">{len(vignettes)} asset(s) en référence, '
+                      f'4 crédits</span></div>')
+        else:
+            visuel = ('<div class="vide">aucun asset<br><span>scène générée de zéro, '
+                      '2 crédits</span></div>')
     else:
         visuel = '<div class="vide compose">composé en HTML<br><span>aucune génération</span></div>'
         classe_visuel = "visuel plat"
@@ -96,6 +131,16 @@ article{{display:grid;grid-template-columns:250px 1fr;gap:22px;padding:18px 0;
  position:sticky;top:14px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center}}
 .visuel img{{width:100%;display:block}}
 .vide{{color:#5a534b;font-size:12px;text-align:center;padding:14px}}
+.matiere{{width:100%;height:100%;display:flex;flex-direction:column;
+ justify-content:center;gap:8px;padding:10px}}
+.matiere .grille{{display:grid;gap:5px;
+ grid-template-columns:repeat(auto-fit,minmax(58px,1fr))}}
+.matiere img{{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;
+ background:#1c1917;display:block}}
+.matiere .absent{{display:flex;align-items:center;justify-content:center;
+ aspect-ratio:1;border:1px dashed #6b3a32;border-radius:5px;color:#c4685c;
+ font-size:9px;text-align:center;padding:4px}}
+.matiere .legende{{color:#5a534b;font-size:10.5px;text-align:center}}
 .visuel.plat{{aspect-ratio:auto;min-height:0;padding:20px 12px;background:#131110}}
 .vide.compose{{color:#4e7f5e}}
 .vide span{{color:#3d3831;font-size:11px}}
@@ -133,7 +178,7 @@ header b{{font-family:ui-monospace,Menlo,monospace;color:#f2b47a;font-size:14px}
  <div><b>{len(creas)}</b>créas au plan</div>
  <div><b>{len(creas) - len(a_generer)}</b>composées, 0 crédit</div>
  <div><b>{len(generes)}/{len(a_generer)}</b>générées</div>
- <div><b>{len(a_generer) * 2}</b>crédits au total</div>
+ <div><b>{_credits(a_generer)}</b>crédits au total</div>
 </div>
 {"".join(_bloc_crea(commande, x) for x in creas)}
 </body></html>"""
