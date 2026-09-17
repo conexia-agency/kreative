@@ -95,6 +95,12 @@ MOTIFS_PAGE_DE_GARDE = [
 NOEUDS_MINIMUM = 60      # elements du DOM
 TEXTE_MINIMUM = 400      # caracteres de texte visible
 
+# Les couleurs que le NAVIGATEUR pose quand personne n'a choisi : le bleu du lien
+# non visite, le violet du lien visite, le rouge du lien actif. Ce ne sont jamais
+# des couleurs de marque, et elles se glissent dans la mesure par les liens de
+# pied de page laisses sans style.
+COULEURS_AGENT = {"#0000EE", "#551A8B", "#EE0000", "#0000FF", "#000080"}
+
 
 class SiteInexploitable(RuntimeError):
     pass
@@ -244,22 +250,71 @@ LECTURE_PAGE = r"""
   document.querySelectorAll('p, li, span').forEach(el => compter('texte', getComputedStyle(el).color, 1));
   document.querySelectorAll('a').forEach(el => compter('liens', getComputedStyle(el).color, 1));
 
+  // Les BORDURES portent souvent la couleur de marque, et rien ne les lisait.
+  // Sur podmax.fr, le violet de la marque ne vit que dans le logo (une image,
+  // donc hors charte par doctrine), dans la bordure du rectangle de selection
+  // autour d'un mot, et dans le cerne des cartes. Sans cette collecte, la
+  // mesure ne trouvait aucun accent et retombait sur la couleur des liens.
+  document.querySelectorAll('div, section, span, a, article, li').forEach(el => {
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    if (r.width < 24 || r.height < 12) return;
+    if (parseFloat(s.borderTopWidth) >= 1 || parseFloat(s.borderLeftWidth) >= 1) {
+      compter('bordures', s.borderTopColor || s.borderLeftColor, 3);
+    }
+    // Et la LUEUR. Sur une direction artistique en fond sombre, la couleur de
+    // marque ne vit ni dans un fond ni dans une bordure : elle est dans le halo
+    // porte par box-shadow. C'est tout podmax.fr, dont le violet #780096
+    // n'apparait que la, en couches successives autour des cartes.
+    if (s.boxShadow && s.boxShadow !== 'none') {
+      (s.boxShadow.match(/rgba?\([^)]+\)/g) || []).forEach(c => compter('lueurs', c, 2));
+    }
+  });
+
+  // Un bouton est une chose VISUELLE, pas une classe qui s'appelle « btn ».
+  // Le selecteur par nom de classe ne trouvait rien sur un site Framer, dont
+  // les classes sont generees : la charte sortait sans aucun bouton alors que
+  // la page en affiche cinq. On garde les selecteurs explicites, et on ajoute
+  // la reconnaissance par la forme : un fond, un arrondi, du remplissage, et
+  // un texte court.
   const boutons = [];
-  document.querySelectorAll('button, a[class*=btn], a[class*=button], a[class*=cta], [role=button], input[type=submit]').forEach(el => {
+  const vus = new Set();
+  const noter = (el) => {
+    if (vus.has(el)) return;
     const s = getComputedStyle(el);
     const label = txt(el) || el.value || '';
     if (!label || label.length > 60) return;
+    vus.add(el);
     compter('boutons', s.backgroundColor, 5);
     boutons.push({ label, fond: s.backgroundColor, couleur: s.color, rayon: s.borderRadius,
       bordure: s.border, ombre: s.boxShadow, graisse: s.fontWeight, casse: s.textTransform,
       police: s.fontFamily, remplissage: s.padding });
+  };
+  document.querySelectorAll('button, a[class*=btn], a[class*=button], a[class*=cta], [role=button], input[type=submit]').forEach(noter);
+  document.querySelectorAll('a, div[onclick], [tabindex]').forEach(el => {
+    const s = getComputedStyle(el);
+    const rayon = parseFloat(s.borderTopLeftRadius) || 0;
+    const fond = s.backgroundColor;
+    const opaque = fond && fond !== 'transparent' && !/rgba\(0, 0, 0, 0\)/.test(fond);
+    const rembourrage = parseFloat(s.paddingLeft) || 0;
+    const r = el.getBoundingClientRect();
+    if (!opaque || rayon < 4 || rembourrage < 8) return;
+    if (r.height < 24 || r.height > 90 || r.width < 60 || r.width > 420) return;
+    if (el.querySelectorAll('a, button').length) return;   // un conteneur, pas un bouton
+    noter(el);
   });
 
   const polices = {};
   const pol = (role, el) => { if (el) polices[role] = { famille: getComputedStyle(el).fontFamily,
       graisse: getComputedStyle(el).fontWeight, taille: getComputedStyle(el).fontSize,
       casse: getComputedStyle(el).textTransform, interlettrage: getComputedStyle(el).letterSpacing }; };
-  pol('corps', document.body); pol('h1', document.querySelector('h1'));
+  // La police de corps se lit sur un VRAI paragraphe, pas sur `body`. Un body
+  // sans `font-family` declaree rend la famille generique de l'agent (« sans-serif »),
+  // alors que tous ses enfants affichent la police de la marque : podmax.fr
+  // ressortait en « sans-serif » avec Poppins chargee et employee partout.
+  const corpsReel = Array.from(document.querySelectorAll('p, li'))
+    .find(el => (el.innerText || '').trim().length > 40) || document.body;
+  pol('corps', corpsReel); pol('h1', document.querySelector('h1'));
   pol('h2', document.querySelector('h2')); pol('h3', document.querySelector('h3'));
   pol('bouton', document.querySelector('button, a[class*=btn], a[class*=button]'));
   const policesChargees = [];
@@ -296,6 +351,35 @@ LECTURE_PAGE = r"""
   }).filter(Boolean);
   const reseaux = Array.from(new Set(Array.from(document.querySelectorAll('a[href]')).map(a => a.href)
     .filter(h => /instagram|facebook|linkedin|tiktok|youtube|twitter|x\.com|pinterest/.test(h)))).slice(0, 12);
+  // L'accroche TELLE QU'ELLE S'AFFICHE, quel que soit le balisage. Les titres
+  // animes mot par mot (Framer, Webflow) mettent chaque mot dans son propre
+  // h1 : podmax.fr rendait `h1 = ["videos", "shorts", "podcast", "formations"]`
+  // pour une phrase qui se lit « Pret a tourner vos videos dans des decors
+  // d'exception ? ». Un skill qui lit ce champ croit que le message du site est
+  // le mot « videos ». On repere donc le plus gros texte du haut de page et on
+  // remonte au bloc qui le contient.
+  let accrocheHeros = '';
+  try {
+    let plusGros = null, taille = 0;
+    document.querySelectorAll('h1, h2, h3, p, span, div').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.top > 900 || r.width < 120) return;
+      if (!(el.innerText || '').trim()) return;
+      if (el.children.length > 3) return;
+      const t = parseFloat(getComputedStyle(el).fontSize) || 0;
+      if (t > taille) { taille = t; plusGros = el; }
+    });
+    if (plusGros) {
+      let bloc = plusGros;
+      for (let i = 0; i < 4 && bloc.parentElement; i++) {
+        const t = txt(bloc.parentElement);
+        if (t.length > 220) break;
+        bloc = bloc.parentElement;
+      }
+      accrocheHeros = txt(bloc).slice(0, 220);
+    }
+  } catch (e) {}
+
   const liens = Array.from(new Set(Array.from(document.querySelectorAll('a[href]')).map(a => a.href)));
   const liensNav = Array.from(new Set(Array.from(document.querySelectorAll('header a[href], nav a[href]')).map(a => a.href)));
   const meta = (n) => { const m = document.querySelector(`meta[name="${n}"], meta[property="${n}"]`); return m ? m.content : null; };
@@ -304,6 +388,7 @@ LECTURE_PAGE = r"""
     titre: document.title, description: meta('description'),
     og: { titre: meta('og:title'), description: meta('og:description') },
     langue: document.documentElement.lang || null,
+    accroche_heros: accrocheHeros,
     h1: liste('h1', 5), h2: liste('h2', 20), h3: liste('h3', 30),
     paragraphes_heros: liste('header p, section:first-of-type p, main > *:first-child p', 6),
     boutons, prix, temoignages, jsonld, reseaux, liens, liens_nav: liensNav,
@@ -436,8 +521,19 @@ def _hex(rgb: str) -> Optional[str]:
 
 
 def _neutre(hexa: str) -> bool:
+    """Cette couleur peut-elle servir d'accent, ou n'est-elle qu'un fond ?
+
+    L'écart entre les canaux ne suffit pas. `#0D0117` est un violet
+    mathématiquement saturé, et c'est le fond de podmax.fr : posé comme accent,
+    il donnerait un mot « mis en valeur » en noir sur noir. Un accent doit aussi
+    être assez lumineux pour se voir, et assez sombre pour ne pas être un blanc
+    cassé. On borne donc la luminance en plus de la saturation.
+    """
     r, g, b = (int(hexa[i:i + 2], 16) for i in (1, 3, 5))
-    return max(r, g, b) - min(r, g, b) < 18
+    if max(r, g, b) - min(r, g, b) < 18:
+        return True
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return luminance < 40 or luminance > 232
 
 
 def synthese_charte(lectures: List[dict]) -> dict:
@@ -454,9 +550,25 @@ def synthese_charte(lectures: List[dict]) -> dict:
         total = sum(roles.get(role, Counter()).values()) or 1
         return [{"hex": h, "part": round(p / total, 3)} for h, p in roles.get(role, Counter()).most_common(n)]
 
-    accents = [c for c in classer("boutons", 10) if not _neutre(c["hex"])]
+    # L'accent se cherche là où une marque le pose, dans cet ordre de confiance :
+    # le fond des boutons, puis les bordures, puis les liens et les titres. Les
+    # bordures ont été ajoutées après podmax.fr, dont le violet ne vit que là.
+    #
+    # Aucun de ces gisements ne doit rendre une couleur que PERSONNE n'a choisie.
+    # Le bleu `#0000EE` est celui qu'un navigateur donne à un lien non stylé : il
+    # sortait en tête des accents de podmax.fr à 78 %, et une marque violette
+    # serait partie en bleu sans que rien ne le signale.
+    def utiles(role: str, n: int = 10) -> List[dict]:
+        return [c for c in classer(role, n)
+                if not _neutre(c["hex"]) and c["hex"].upper() not in COULEURS_AGENT]
+
+    accents = utiles("boutons")
     if not accents:
-        accents = [c for c in classer("liens", 10) + classer("titres", 10) if not _neutre(c["hex"])]
+        accents = utiles("bordures")
+    if not accents:
+        accents = utiles("lueurs")
+    if not accents:
+        accents = utiles("liens") + utiles("titres")
 
     familles = Counter()
     for lecture in lectures:
@@ -635,6 +747,19 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
             except Exception as erreur:
                 erreurs.append(f"capture {slug} : {str(erreur)[:120]}")
 
+            # La redirection peut amener deux URL demandees differentes sur la
+            # meme page reelle : podmax.fr et www.podmax.fr/ ont ainsi occupe
+            # deux des cinq places du relevé pour un seul contenu.
+            #
+            # On ne compare QUE si l'adresse a bougé. L'URL demandée est déjà
+            # dans `vues` depuis le haut de la boucle : comparer sans cette
+            # condition rejetait toutes les pages sauf la première.
+            arrivee = canonique(page.url)
+            if arrivee != canonique(cible):
+                if arrivee in vues:
+                    continue
+                vues.add(arrivee)
+
             lecture["url"] = page.url
             lecture["statut"] = reponse.status if reponse else None
             lectures.append(lecture)
@@ -754,7 +879,9 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
         "duree_s": round(time.time() - debut, 1),
         "pages": [{
             "url": l["url"], "titre": l.get("titre"), "description": l.get("description"),
-            "og": l.get("og"), "langue": l.get("langue"), "h1": l.get("h1"), "h2": l.get("h2"),
+            "og": l.get("og"), "langue": l.get("langue"),
+            "accroche_heros": l.get("accroche_heros"),
+            "h1": l.get("h1"), "h2": l.get("h2"),
             "h3": l.get("h3"), "paragraphes_heros": l.get("paragraphes_heros"),
             "cta": list(dict.fromkeys(b["label"] for b in l.get("boutons", [])))[:20],
             "prix": l.get("prix"), "temoignages": l.get("temoignages"),

@@ -384,6 +384,106 @@ def ouvrir_commande(soumission: dict, brief: dict) -> Path:
     return dossier
 
 
+# Deux soumissions de la même marque sur le même pack à moins de ce délai sont
+# le MÊME brief : un client qui revient le lendemain complète, il ne recommande
+# pas. Podmax l'a fait le 24 puis le 25 août, la première portant son logo et la
+# seconde le brief complet. Au delà, c'est une nouvelle commande, et un humain
+# tranche. Un pack se livre en jours : trente est large et sans ambiguïté.
+FENETRE_COMPLEMENT_JOURS = 30
+
+
+def _complementaire(soumission: dict, pack: str, dossier: Path) -> bool:
+    """Cette soumission complète-t-elle la commande déjà ouverte ?"""
+    fichier = dossier / "commande.json"
+    if not fichier.exists():
+        return False
+    try:
+        donnees = json.loads(fichier.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    if donnees.get("pack") != pack:
+        return False
+    # Une commande déjà passée en production ne se laisse pas réécrire par une
+    # soumission tardive : les créas sont planifiées, les crédits peut-être
+    # dépensés. Ce cas-là demande un humain.
+    if donnees.get("etat") not in (None, "recue", "intake"):
+        return False
+
+    precedente = (dossier / "brief" / "soumission.json")
+    if not precedente.exists():
+        return False
+    try:
+        avant = json.loads(precedente.read_text(encoding="utf-8")).get("submissionTime") or ""
+        apres = soumission.get("submissionTime") or ""
+        ecart = datetime.fromisoformat(apres.replace("Z", "+00:00")) - \
+            datetime.fromisoformat(avant.replace("Z", "+00:00"))
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return 0 <= ecart.days <= FENETRE_COMPLEMENT_JOURS
+
+
+def completer_commande(soumission: dict, brief: dict, dossier: Path) -> dict:
+    """Fusionne une soumission tardive dans la commande déjà ouverte.
+
+    Le texte du brief le plus récent gagne, parce que c'est la dernière chose
+    que le client a dite. Les **pièces jointes s'additionnent** : la première
+    soumission de Podmax portait son logo et la seconde n'a rien joint, garder
+    seulement la dernière ferait perdre le seul asset de marque du dossier.
+
+    Aucune soumission n'est écrasée. Elles vivent toutes dans
+    `brief/soumissions/`, et `soumission.json` pointe sur la plus récente :
+    la convention exige qu'une soumission brute ne soit jamais modifiée, elle
+    n'interdit pas qu'il y en ait plusieurs.
+    """
+    from etat import Commande
+
+    commande = Commande.charger(dossier.name)
+    ancien = commande.donnees.get("brief") or {}
+    fichiers = brief.pop("_fichiers_zite", {})
+
+    # Les anciennes pièces jointes d'abord : ce sont les chemins déjà sur disque.
+    assets = {cle: list(valeurs) for cle, valeurs in (ancien.get("assets") or {}).items()}
+    for cle, valeurs in (brief.get("assets") or {}).items():
+        assets.setdefault(cle, [])
+
+    archives = dossier / "brief" / "soumissions"
+    archives.mkdir(parents=True, exist_ok=True)
+    for source in (dossier / "brief" / "soumission.json",):
+        if source.exists():
+            precedent = json.loads(source.read_text(encoding="utf-8"))
+            nom = f"{(precedent.get('submissionTime') or '')[:19].replace(':', '')}-{precedent.get('submissionId')}.json"
+            (archives / nom).write_text(json.dumps(precedent, ensure_ascii=False, indent=2),
+                                        encoding="utf-8")
+
+    (dossier / "brief" / "soumission.json").write_text(
+        json.dumps(soumission, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    echecs, ajoutes = [], 0
+    for categorie, liste in fichiers.items():
+        for index, fichier in enumerate(liste, start=1):
+            cible = (dossier / "brief" / "pieces-jointes" / categorie
+                     / _nom_fichier(fichier, index))
+            if telecharger(fichier["url"], cible):
+                chemin = str(cible.relative_to(dossier))
+                if chemin not in assets.setdefault(categorie, []):
+                    assets[categorie].append(chemin)
+                    ajoutes += 1
+            else:
+                echecs.append(f"{categorie}/{fichier.get('filename')}")
+
+    brief["assets"] = assets
+    commande.donnees["brief"] = brief
+    commande.sauver()
+    (dossier / "brief" / "brief.json").write_text(
+        json.dumps(brief, ensure_ascii=False, indent=2), encoding="utf-8")
+    commande.tracer("brief_zite_complete",
+                    submission_id=soumission.get("submissionId"),
+                    pieces_jointes_ajoutees=ajoutes,
+                    pieces_jointes_totales=sum(len(v) for v in assets.values()),
+                    echecs_telechargement=echecs)
+    return {"ajoutes": ajoutes, "total": sum(len(v) for v in assets.values())}
+
+
 def relever(appliquer: bool = False) -> List[dict]:
     traitees = _lire_traitees()
     rapport: List[dict] = []
@@ -412,13 +512,20 @@ def relever(appliquer: bool = False) -> List[dict]:
             if rejet:
                 ligne["action"] = f"rejet : {rejet}"
             elif dossier_existant and dossier_existant.exists():
-                ligne["action"] = "en attente : un dossier porte deja ce nom"
+                if _complementaire(soumission, pack, dossier_existant):
+                    ligne["action"] = "complement du brief"
+                else:
+                    ligne["action"] = "en attente : un dossier porte deja ce nom"
             else:
                 ligne["action"] = "ouverture"
 
             if appliquer:
                 if ligne["action"] == "ouverture":
                     ligne["dossier"] = str(ouvrir_commande(soumission, brief))
+                elif ligne["action"] == "complement du brief":
+                    bilan = completer_commande(soumission, brief, dossier_existant)
+                    ligne["dossier"] = str(dossier_existant)
+                    ligne["pieces_jointes_ajoutees"] = bilan["ajoutes"]
                 elif ligne["action"].startswith("en attente"):
                     attente = DOSSIER_ATTENTE / f"{ardoise(brief['marque'])}-{identifiant}"
                     attente.mkdir(parents=True, exist_ok=True)
