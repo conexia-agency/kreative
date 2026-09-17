@@ -26,12 +26,12 @@ from etat import Commande, Crea
 
 
 def _credits(creas: List[Crea]) -> str:
-    """Le coût du lot, tiré de la table mesurée et non d'un « fois deux ».
+    """Le coût du lot, tiré de la table mesurée et non d'un chiffre écrit ici.
 
-    L'ancienne version comptait deux crédits par créa. C'est faux dès qu'un
-    asset est joint : Nano Banana Pro passe alors de 2 à 4. Sur le pack Podmax,
-    treize créas sur dix-huit sont en image vers image, et la page annonçait 36
-    crédits pour une dépense réelle de 62.
+    L'ancienne version comptait deux crédits par créa en dur. Le nombre tombait
+    juste sur Nano Banana Pro et serait faux sur n'importe quel autre modèle,
+    dont les tarifs vont de 1 à 7. On lit donc la table, qui se corrige elle
+    même sur les relevés de transactions.
     """
     import couts
     bilan = couts.devis([{"modele": c.prompt.modele,
@@ -63,12 +63,21 @@ def _bloc_crea(commande: Commande, crea: Crea) -> str:
                 vignettes.append(f'<span class="absent" title="{html.escape(chemin)}">'
                                  f'asset introuvable</span>')
         if vignettes:
+            # Le prix vient de la table mesuree, jamais d'un chiffre ecrit ici :
+            # la legende annoncait 4 credits pour une image vers image, tarif
+            # que le releve de transactions du 17/09 a démenti.
+            import couts
+            prix = couts.prix(crea.prompt.modele, references=len(vignettes))
+            chiffre = f"{prix:g} crédits" if prix is not None else "coût non mesuré"
             visuel = (f'<div class="matiere"><div class="grille">{"".join(vignettes)}</div>'
                       f'<span class="legende">{len(vignettes)} asset(s) en référence, '
-                      f'4 crédits</span></div>')
+                      f'{chiffre}</span></div>')
         else:
+            import couts
+            prix = couts.prix(crea.prompt.modele)
+            chiffre = f"{prix:g} crédits" if prix is not None else "coût non mesuré"
             visuel = ('<div class="vide">aucun asset<br><span>scène générée de zéro, '
-                      '2 crédits</span></div>')
+                      f'{chiffre}</span></div>')
     else:
         visuel = '<div class="vide compose">composé en HTML<br><span>aucune génération</span></div>'
         classe_visuel = "visuel plat"
@@ -107,11 +116,25 @@ def _bloc_crea(commande: Commande, crea: Crea) -> str:
  </div></article>"""
 
 
+def _ratio(commande: Commande, creas: List[Crea]) -> str:
+    """Le format d'affichage, lu sur un master reel plutot que suppose."""
+    for crea in creas:
+        if crea.master and (commande.dossier / crea.master).exists():
+            try:
+                from PIL import Image
+                l, h = Image.open(commande.dossier / crea.master).size
+                return f"{l}/{h}"
+            except Exception:
+                break
+    return "1/1"
+
+
 def construire(commande: Commande) -> str:
     creas = commande.creas()
     d = commande.donnees
     a_generer = [x for x in creas if x.prompt.scene]
     generes = [x for x in a_generer if x.master]
+    ratio = _ratio(commande, creas)
 
     return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -125,10 +148,13 @@ h1{{font-size:19px;font-weight:650;letter-spacing:-.02em}}
  border-bottom:1px solid #241f1b;flex-wrap:wrap}}
 .jauge div{{font-size:12px;color:#8b857c}}
 .jauge b{{display:block;font-size:22px;color:#eae7e2;font-weight:650}}
-article{{display:grid;grid-template-columns:250px 1fr;gap:22px;padding:18px 0;
+article{{display:grid;grid-template-columns:420px 1fr;gap:26px;padding:20px 0;
  border-bottom:1px solid #1c1917;align-items:start}}
+/* Le cadre suit le format du master, qui est passe en 1:1 le 17/09. Un
+   emplacement fige en 9:16 affichait les carres en timbre-poste au milieu
+   d'une page de dix-huit entrees : on ne voyait plus ce qu'on avait produit. */
 .visuel{{background:#000;border:1px solid #2a2521;border-radius:8px;overflow:hidden;
- position:sticky;top:14px;aspect-ratio:9/16;display:flex;align-items:center;justify-content:center}}
+ position:sticky;top:14px;aspect-ratio:{ratio};display:flex;align-items:center;justify-content:center}}
 .visuel img{{width:100%;display:block}}
 .vide{{color:#5a534b;font-size:12px;text-align:center;padding:14px}}
 .matiere{{width:100%;height:100%;display:flex;flex-direction:column;

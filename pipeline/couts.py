@@ -74,8 +74,16 @@ class Tarif:
 # compte Conexia en plan ultra. Les modèles absents de cette table ne sont pas
 # gratuits : ils ne sont pas mesurés.
 TARIFS: Dict[str, Tarif] = {
-    "nano_banana_pro": Tarif(2.0, "2026-09-08", "le modèle du cahier des charges", i2i=4.0),
-    "nano_banana_2": Tarif(2.0, "2026-09-11", "alias accepté, même prix que le Pro", i2i=4.0),
+    # Mesuré le 17/09 sur le lot Podmax, relevé de transactions à l'appui : six
+    # images à 2 crédits, dont CINQ avec références. L'image vers image ne coûte
+    # donc pas plus cher, contrairement à ce que cette table affirmait depuis le
+    # 08/09. L'ancienne valeur de 4 venait d'un relevé fait à la ligne de
+    # commande et jamais recoupé ; ce jour-là, le solde avait bougé de 96 alors
+    # que la dépense réelle était de 12, le reste étant des vidéos lancées en
+    # parallèle par quelqu'un d'autre. C'est la démonstration que le solde seul
+    # ne prouve rien, et que seul le relevé ligne par ligne attribue un coût.
+    "nano_banana_pro": Tarif(2.0, "2026-09-17", "mesuré sur relevé, i2i au même prix"),
+    "nano_banana_2": Tarif(2.0, "2026-09-17", "ce que le serveur renvoie quand on demande le Pro"),
     "nano_banana_flash": Tarif(1.5, "2026-09-11", "s'affiche « Nano Banana 2 », n'est pas le Pro"),
     "nano_banana_2_lite": Tarif(1.0, "2026-09-11"),
     "gpt_image_2_5": Tarif(1.5, "2026-09-11", "qualité basse ; les paliers hauts coûtent plus"),
