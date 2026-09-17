@@ -39,6 +39,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -79,8 +80,48 @@ def _tesseract_disponible() -> bool:
         return False
 
 
+def _normaliser(texte: str) -> List[str]:
+    """Les mots d'au moins quatre lettres, sans accent ni casse.
+
+    Quatre lettres, parce que l'OCR produit toujours des parasites d'une ou deux
+    lettres sur une photo. Sans accent, parce que tesseract confond régulièrement
+    é et e sur une typographie grasse, et qu'un rejet sur cette base serait faux.
+    """
+    plie = unicodedata.normalize("NFD", texte or "")
+    plie = "".join(c for c in plie if unicodedata.category(c) != "Mn").lower()
+    return re.findall(r"[a-z]{4,}", plie)
+
+
+# Seuils PROVISOIRES. Ils ne sortent d'aucune mesure : la chaîne n'a pas encore
+# produit de rendu à texte cuit sur lequel les calibrer. Ils sont posés larges
+# exprès, pour attraper la faute grossière sans condamner une créa correcte que
+# l'OCR aurait mal lue. À revoir sur les premiers packs réels.
+RAPPEL_MINIMUM = 0.5      # moitié de la copy absente = le modèle ne l'a pas rendue
+INTRUS_ALERTE = 3         # au delà, du texte non demandé apparaît
+
+
 def c1_texte_grave(commande: Commande, crea: Crea) -> Optional[Constat]:
-    """Le master ne doit contenir aucun texte. Le prompt l'interdit."""
+    """Le texte gravé doit être PRÉSENT et JUSTE.
+
+    Ce contrôle disait l'inverse jusqu'au 17/09 : le prompt interdisait tout
+    texte, et lire un seul mot dans un master était un échec. La décision de
+    faire peindre le texte par le modèle le retourne. La question n'est plus
+    « y a-t-il du texte », elle est « est-ce le bon ».
+
+    Deux défaillances distinctes, et elles n'appellent pas la même réaction.
+
+    **Le rappel** : la part de la copy attendue qu'on retrouve dans l'image. Un
+    rappel bas veut dire que le modèle n'a pas rendu l'accroche, ou l'a rendue
+    illisible. C'est bloquant, la créa est à régénérer.
+
+    **Les intrus** : des mots lus dans l'image qui ne sont dans aucun champ de
+    copy. C'est le faux texte que le skill lui-même désigne comme le tell IA
+    numéro un. Mais ce n'est qu'une ALERTE, jamais un échec, parce qu'un asset
+    réel joint en référence (une capture d'interface, un packaging) porte
+    légitimement ses propres mots. Trancher automatiquement entre les deux
+    demanderait de savoir ce que contient l'asset, ce qu'on ne sait pas faire
+    ici. On montre donc les mots, et un humain regarde.
+    """
     if not crea.master:
         return None
     chemin = commande.dossier / crea.master
@@ -93,17 +134,48 @@ def c1_texte_grave(commande: Commande, crea: Crea) -> Optional[Constat]:
         texte = brut.stdout.decode("utf-8", "replace")
     except Exception:
         return None
-    # On ne compte que les mots d'au moins quatre lettres : l'OCR produit
-    # toujours quelques parasites d'une ou deux lettres sur une photo.
-    mots = [m for m in re.findall(r"[A-Za-zÀ-ÿ]{4,}", texte)]
-    if not mots:
+
+    lus = set(_normaliser(texte))
+    attendus = set()
+    for champ in (crea.copy.accroche, crea.copy.sous_accroche,
+                  crea.copy.cta, crea.copy.badge):
+        attendus.update(_normaliser(champ))
+
+    if not attendus:
+        # Une créa sans copy : le contrôle n'a rien à comparer.
         return Constat("C1 texte gravé", crea.identifiant, "ok",
-                       "aucun texte lu dans le master")
-    return Constat(
-        "C1 texte gravé", crea.identifiant, "echec",
-        f"{len(mots)} mot(s) lus dans le master alors que le prompt interdit tout texte. "
-        f"Le modèle a gravé du texte : la créa est à régénérer.",
-        preuve=" ".join(mots[:8]))
+                       "aucune copy attendue, rien à vérifier")
+
+    trouves = attendus & lus
+    rappel = len(trouves) / len(attendus)
+    intrus = sorted(lus - attendus)
+
+    if not lus:
+        return Constat(
+            "C1 texte gravé", crea.identifiant, "echec",
+            "aucun texte lu dans le master alors que la copy devait y être peinte. "
+            "Le modèle a ignoré le texte : la créa est à régénérer.",
+            preuve=crea.copy.accroche[:80])
+
+    if rappel < RAPPEL_MINIMUM:
+        manquants = sorted(attendus - trouves)
+        return Constat(
+            "C1 texte gravé", crea.identifiant, "echec",
+            f"seulement {len(trouves)} mot(s) de la copy sur {len(attendus)} "
+            f"retrouvés dans l'image ({rappel:.0%}). Le modèle n'a pas rendu le "
+            f"texte demandé : la créa est à régénérer.",
+            preuve="absents : " + " ".join(manquants[:8]))
+
+    if len(intrus) > INTRUS_ALERTE:
+        return Constat(
+            "C1 texte gravé", crea.identifiant, "alerte",
+            f"copy retrouvée à {rappel:.0%}, mais {len(intrus)} mot(s) lus dans "
+            f"l'image ne viennent d'aucun champ de copy. Soit ils appartiennent à "
+            f"un asset réel joint, soit le modèle a inventé du texte : à regarder.",
+            preuve=" ".join(intrus[:8]))
+
+    return Constat("C1 texte gravé", crea.identifiant, "ok",
+                   f"copy retrouvée à {rappel:.0%}, aucun texte étranger notable")
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,12 @@ from typing import Dict, List, Optional
 import couts
 from etat import Commande, Crea
 
-FORMAT_MASTER = "9:16"
+# Le 1:1 est le format du skill de stratégie créative, et c'est aussi ce qui
+# reste cohérent avec le texte cuit décidé le 17/09 : une image dont le texte est
+# peint dedans ne se recadre pas, donc le master EST le livrable. L'ancien 9:16
+# n'avait de sens que pour la chaîne composée, où les trois formats se tiraient
+# d'un même master par recadrage sans nouvel appel au modèle.
+FORMAT_MASTER = "1:1"
 RESOLUTION = "2k"
 
 # Au-delà, la chaîne s'arrête et demande. C'est l'un des trois seuls arrêts sur

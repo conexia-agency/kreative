@@ -259,10 +259,25 @@ def verifier(nom: Optional[str] = None, racine: Path = RACINE_DEFAUT) -> List[di
                 ecarts.append(f"etat inconnu : {donnees.get('etat')}")
             if donnees.get("pack") and donnees["pack"] not in PACKS:
                 ecarts.append(f"pack inconnu : {donnees['pack']}")
+            # Le volume se vérifie par la COHÉRENCE INTERNE de la commande, pas
+            # par la règle en vigueur aujourd'hui. Le 17/09, l'abandon de la
+            # surproduction a fait passer le facteur de 2 à 1, et les 22
+            # commandes ouvertes se sont mises à signaler un écart d'un seul
+            # coup, alors qu'aucune n'avait bougé : elles étaient justes sous la
+            # règle de leur création, et tpw-growth a bien ses 24 créas sur le
+            # disque. Un contrôle qui condamne tout le passé à chaque changement
+            # de règle apprend à ignorer les alertes.
+            #
+            # Est donc en écart une commande dont le volume déclaré ne
+            # correspond NI à la règle du jour, NI au nombre de créas réellement
+            # planifiées. Ce cas-là est une vraie incohérence.
+            declaree = donnees.get("quantite_generee")
             attendue = volume_genere(donnees.get("quantite_vendue", 0))
-            if donnees.get("quantite_generee") not in (None, attendue):
+            planifiees = len(list((dossier / "creas").glob("*.json")))
+            if declaree is not None and declaree != attendue and declaree != planifiees:
                 ecarts.append(
-                    f"quantite_generee {donnees.get('quantite_generee')} au lieu de {attendue}"
+                    f"quantite_generee {declaree} : ni la règle du jour ({attendue}) "
+                    f"ni le nombre de créas planifiées ({planifiees})"
                 )
             ardoise_attendue = ardoise(donnees.get("marque", ""))
             if ardoise_attendue and dossier.name != ardoise_attendue:

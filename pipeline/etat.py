@@ -47,17 +47,29 @@ VERSION_SCHEMA = 1
 RACINE_DEFAUT = Path(__file__).resolve().parent.parent / "commandes"
 
 # ---------------------------------------------------------------------------
-# Packs. Règle 4.6 : on génère systématiquement le double du volume vendu.
-# La règle est proportionnelle, donc elle vaut pour tout pack futur.
+# Packs. Les volumes sont ceux du skill de stratégie créative, et ce sont les
+# volumes PRODUITS : 3 angles pour Starter, 6 pour Growth, 9 pour Scale, à deux
+# créas par angle. Deux créas par angle est un plancher et non un confort : en
+# dessous, on ne distingue plus « l'angle ne marche pas » de « cette exécution
+# ne marche pas ».
+#
+# Décision du 17/09 : **on ne surproduit plus.** Le 4.6 du cahier des charges
+# demandait le double du volume vendu, soit 12, 24 et 48. Ce qui est produit est
+# désormais ce qui est livré. Le facteur reste ici à 1 plutôt que d'être
+# supprimé : le jour où la surproduction revient, c'est une valeur à changer et
+# non une mécanique à réécrire.
+#
+# Conséquence à connaître : il n'y a plus de marge de tri à la réception. Chaque
+# créa doit être bonne, pas seulement la moitié.
 # ---------------------------------------------------------------------------
 
 PACKS: Dict[str, int] = {
     "starter": 6,
     "growth": 12,
-    "scale": 24,
+    "scale": 18,
 }
 
-FACTEUR_SURPRODUCTION = 2
+FACTEUR_SURPRODUCTION = 1
 
 
 def volume_genere(quantite_vendue: int) -> int:
