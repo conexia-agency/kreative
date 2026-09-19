@@ -316,9 +316,13 @@ def _config() -> dict:
     absents = [n for n in noms if not os.environ.get(n)]
     if absents:
         raise RuntimeError(
-            "accès plateforme absents de l'environnement : " + ", ".join(absents)
-            + ". Les poser dans le .env de l'espace de travail (voir "
-            "references/installation.md), jamais en clair ailleurs.")
+            "ÉTAPE OPTIONNELLE NON CONFIGURÉE, à sauter sans conséquence : "
+            "la plateforme de revue n'est pas branchée sur ce poste ("
+            + ", ".join(absents) + " absents de l'environnement). La livraison "
+            "du pack est déjà complète sans elle : livrer.py a fait le dossier "
+            "et la notification. Ne configurer ces accès que si Kreative "
+            "utilise le portail de revue (voir installation.md), jamais en "
+            "clair ailleurs que dans le .env.")
     return {n: os.environ[n].rstrip("/") if n.endswith(("SITE", "URL"))
             else os.environ[n] for n in noms}
 

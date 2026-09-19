@@ -107,7 +107,7 @@ neuf prérequis et dit quoi installer (détail : `references/installation.md`).
    conclusion, l'OCR se trompe sur le petit texte.
 8. **Montrer.** `python3 scripts/kreative.py page <ardoise>` écrit la page de
    suivi ; les masters restent dans `commandes/<ardoise>/masters/`.
-9. **Publier en revue** (si la plateforme est branchée sur le poste) :
+9. **Publier en revue, étape FACULTATIVE** : à sauter si les accès `PUBLIE_*` ne sont pas posés, le pack est déjà livré au complet par l'étape 8. Si la plateforme est branchée sur le poste :
     `python3 scripts/pipeline/publier.py <ardoise> --dry-run` puis sans
     `--dry-run`. Les commentaires de l'équipe redescendent avec
     `python3 scripts/pipeline/retours.py <ardoise>`, et chaque reprise se

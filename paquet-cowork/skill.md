@@ -100,7 +100,7 @@ découpe chaque master en quatre zones qui se recouvrent, dans
 juge jamais sur la vignette entière, toutes les fautes se voient au zoom. La livraison crée le
 dossier au nom de la marque et envoie la notification.
 
-Pour la plateforme de revue, en option :
+Pour la plateforme de revue, étape FACULTATIVE : sans les accès `PUBLIE_*` dans l'environnement, elle se saute sans conséquence, la livraison ci-dessus est déjà complète. Si Kreative utilise le portail :
 
     python3 scripts/pipeline/publier.py <ardoise> --client <slug>
     python3 scripts/pipeline/retours.py <ardoise> --client <slug>
