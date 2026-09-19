@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import re
 import sys
@@ -1190,24 +1191,26 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
                 if not extension:
                     ignorees.add(src)
                     continue
+                # Les dimensions se mesurent TOUJOURS sur les octets reçus,
+                # jamais sur le naturalWidth du navigateur : une image affichée
+                # en petit (logo de pied de page, image paresseuse) est notée
+                # minuscule alors que le fichier est en pleine résolution, et le
+                # tri par taille l'écartait à tort. Mesuré sur podmax : le logo
+                # blanc 3667 x 1184 était indexé 223 x 72 et n'a jamais été vu.
                 largeur, hauteur = image.get("largeur") or 0, image.get("hauteur") or 0
+                if extension != ".svg":
+                    try:
+                        from PIL import Image as _Image
+                        with _Image.open(io.BytesIO(contenu)) as _im:
+                            largeur, hauteur = _im.size
+                    except Exception:
+                        pass
                 if 0 < largeur < IMAGE_COTE_MIN and 0 < hauteur < IMAGE_COTE_MIN and extension != ".svg":
                     ignorees.add(src)
                     continue
 
                 fichier = sortie / "assets-site" / f"{empreinte}{extension}"
                 fichier.write_bytes(contenu)
-                # Les sources qui ne sont pas une balise img (fond CSS, poster,
-                # icône déclarée) arrivent sans dimensions : on les mesure sur
-                # le fichier, sinon un favicon de 32 pixels passerait pour un
-                # logo faute de taille connue.
-                if not largeur or not hauteur:
-                    try:
-                        from PIL import Image as _Image
-                        with _Image.open(fichier) as _im:
-                            largeur, hauteur = _im.size
-                    except Exception:
-                        pass
                 par_source[src] = empreinte
                 index[empreinte] = {
                     "fichier": fichier.name, "source": src, "type": image.get("type"),

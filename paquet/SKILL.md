@@ -124,7 +124,9 @@ là aussi, jamais dans le skill.
 
 - Le métier créatif (angles, copy, prompts, assets, banque de références) :
   `references/strategie-creative.md`.
-- L'écriture des prompts, y compris la phrase de fin obligatoire :
-  `references/strategie-creative.md`, et elle seule.
+- L'écriture des prompts : `references/strategie-creative.md`, et elle
+  seule. Une exception, décidée le 19/09/2026 : sa phrase de fin « Nano
+  Banana Pro en restant gratuit » ne s'écrit plus, le connecteur fixe le
+  modèle et la facturation par ses paramètres d'appel.
 - Le poste, les clés, les prérequis : `references/installation.md`.
 - La carte du système, module par module : `references/architecture.md`.

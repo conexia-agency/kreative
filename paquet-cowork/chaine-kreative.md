@@ -55,10 +55,15 @@ directement, sans lui demander un autre format :
     python3 scripts/pipeline/plan.py importer <ardoise> --fichier <sortie-du-skill.md>
 
 L'import refuse le plan entier si le process de la banque n'a pas été suivi,
-si un prompt ne se termine pas par la phrase de fin obligatoire du skill, si
-la copy déclarée porte des mots que le prompt ne peint pas, ou si une
+si la copy déclarée porte des mots que le prompt ne peint pas, ou si une
 indication technique colle au texte à afficher. Rien n'est corrigé en
 silence : chaque refus cite son motif, et la créa repart au skill.
+
+Écart assumé au skill, décidé le 19/09/2026 : sa phrase de fin « Utilise
+la meilleure qualité de Nano Banana Pro en restant gratuit. » ne s'écrit
+plus, et l'import la retire d'un prompt qui la porterait encore. Le
+connecteur fixe le modèle, la résolution et la facturation par ses
+paramètres d'appel, la phrase n'y pilote rien. À signaler à Evan.
 
 ## 4. Après la génération
 

@@ -10,10 +10,13 @@ répond à deux questions mécaniques :
 2. `importer` : la session a produit son plan, on le range dans les créas.
 
 Les contrôles de `importer` sont ceux du skill lui-même, jamais les nôtres :
-la phrase de fin obligatoire de sa section « Règles du prompt », son
-interdiction du tiret cadratin, et sa règle de parité stricte qui veut que tout
-asset nommé dans un prompt existe réellement. Un contrôle qui ne renvoie pas à
-une ligne de son skill n'a rien à faire ici.
+son interdiction du tiret cadratin, et sa règle de parité stricte qui veut que
+tout asset nommé dans un prompt existe réellement. Un contrôle qui ne renvoie
+pas à une ligne de son skill n'a rien à faire ici. Une exception, décidée par
+Tom le 19/09/2026 : la phrase de fin « Nano Banana Pro en restant gratuit »
+de son skill ne s'exige plus et se retire des prompts si elle s'y trouve, le
+connecteur fixant modèle et facturation par ses paramètres d'appel. Écart à
+signaler à Evan.
 
     python3 pipeline/plan.py dossier <ardoise>
     python3 pipeline/plan.py importer <ardoise> --fichier plan.json
@@ -45,6 +48,14 @@ TIRET_CADRATIN = chr(0x2014)
 # en toute dernière phrase, par ce texte exact ». On ne le paraphrase pas, on le
 # recopie, et on vérifie qu'il est là.
 PHRASE_DE_FIN = "Utilise la meilleure qualité de Nano Banana Pro en restant gratuit."
+
+
+def _sans_phrase_de_fin(prompt: str) -> str:
+    """Retire la phrase de fin héritée du contexte Cowork, si présente."""
+    nettoye = prompt.rstrip()
+    if nettoye.endswith(PHRASE_DE_FIN):
+        nettoye = nettoye[: -len(PHRASE_DE_FIN)].rstrip()
+    return nettoye
 
 # Le modèle que nomme cette phrase. La chaîne ne choisit pas le moteur : elle
 # lit celui que le skill impose.
@@ -372,23 +383,28 @@ def controler(plan: dict, commande: Commande) -> Tuple[List[dict], List[str], Li
             refus.append(f"{etiquette} : prompt vide")
             continue
 
+        # Écart assumé au skill de Kreative, décidé par Tom le 19/09/2026 : la
+        # phrase de fin « Utilise la meilleure qualité de Nano Banana Pro en
+        # restant gratuit » ne s'exige plus. Elle vient du contexte Cowork ;
+        # ici le modèle, la résolution et la facturation sont fixés par les
+        # paramètres d'appel du connecteur, pas par le prompt, et « en restant
+        # gratuit » n'a aucun sens sur un appel facturé. Si elle traîne encore
+        # dans un prompt, on la retire silencieusement plutôt que de refuser :
+        # un plan déjà écrit avec elle reste valable.
+        prompt = _sans_phrase_de_fin(prompt)
+
         # Une créa déjà générée avec CE prompt exact ne se refuse plus pour un
         # risque d'écriture : la dépense est faite, l'image existe, et c'est
         # l'audit OCR qui dit si le risque s'est matérialisé. Les contrôles
-        # préventifs ci-dessous ne bloquent que ce qui reste à générer.
+        # préventifs ci-dessous ne bloquent que ce qui reste à générer. La
+        # comparaison ignore la phrase de fin des deux côtés : sa disparition
+        # ne change pas l'image, elle ne doit pas faire regénérer un master.
         try:
             existante = commande.lire_crea(identifiant)
             deja_generee = bool(existante.master) and \
-                (existante.prompt.scene or "").strip() == prompt
+                _sans_phrase_de_fin((existante.prompt.scene or "").strip()) == prompt
         except FileNotFoundError:
             deja_generee = False
-
-        # Skill de Kreative, « Règles du prompt » : la phrase de fin est
-        # obligatoire, en toute dernière phrase, à ce texte exact.
-        if not prompt.rstrip().endswith(PHRASE_DE_FIN):
-            refus.append(f"{etiquette} : le prompt ne se termine pas par la phrase de fin "
-                         f"obligatoire du skill")
-            continue
 
         # Skill de Kreative, « Règles du prompt » : tiret cadratin interdit, ni
         # dans le texte affiché, ni comme élément graphique.
@@ -545,8 +561,11 @@ def importer(ardoise: str, fichier: Path) -> dict:
         # créa repart en génération. Le prompt est inchangé : seuls la copy ou
         # l'angle bougent, le master validé est conservé tel quel et rien ne
         # se regénère. Sans cette distinction, corriger une faute de copy
-        # renvoyait tout le pack au modèle, à deux crédits la créa.
-        prompt_change = (crea.prompt.scene or "") != entree["prompt"]
+        # renvoyait tout le pack au modèle, à deux crédits la créa. La phrase
+        # de fin héritée de Cowork s'ignore des deux côtés : sa disparition ne
+        # change pas l'image.
+        prompt_change = _sans_phrase_de_fin((crea.prompt.scene or "").strip()) \
+            != _sans_phrase_de_fin((entree["prompt"] or "").strip())
         crea.angle = entree["angle"]
         crea.copy.accroche = entree["accroche"]
         crea.copy.sous_accroche = entree["sous_accroche"]

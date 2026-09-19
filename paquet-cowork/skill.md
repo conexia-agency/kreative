@@ -10,8 +10,10 @@ commandes lancer, et dans quel ordre.
 
 **La méthode est dans `resources/strategie-creative.md`**, le skill de Kreative.
 Il fait foi sur la stratégie, les angles, la copy, le choix des assets, la
-lecture du site et l'écriture des prompts, y compris sa phrase de fin
-obligatoire. Applique-le intégralement, sans rien y ajouter ni en retrancher.
+lecture du site et l'écriture des prompts. Applique-le intégralement, à
+une exception près, décidée le 19/09/2026 : sa phrase de fin « Nano
+Banana Pro en restant gratuit » ne s'écrit plus dans les prompts, le
+connecteur fixe le modèle et la facturation par ses paramètres d'appel.
 
 `resources/chaine-kreative.md` dit seulement où la chaîne a déjà déposé les
 fichiers que le skill demande d'aller chercher, et comment sa sortie se range.
