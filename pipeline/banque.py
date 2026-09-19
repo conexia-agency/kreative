@@ -125,11 +125,31 @@ def familles_pour(commande: Commande) -> Tuple[str, List[str], Optional[str]]:
     principale = "ECOMMERCE" if any(m in secteur for m in MOTS_ECOMMERCE) \
         else "AGENCE - SAAS"
 
-    # La demande d'ugly ads se cherche partout ou le client ecrit librement.
+    # Les deux champs dedies du formulaire d'abord. Ils portent la demande par
+    # un curseur et un menu, donc ils ne contiennent JAMAIS les mots ci-dessus :
+    # les chercher dans leur valeur ne pouvait rien trouver. Mesure du 19/09 sur
+    # Attar Studio, qui demandait 30 % d'ugly ads par le curseur et n'ouvrait
+    # aucune planche UG. Le champ se nomme « part_ugly_ads », sa valeur vaut
+    # « 30 » : c'est le nom qui porte le mot, pas le contenu.
+    motif = None
+    part = str(reponses.get("part_ugly_ads") or "").strip().replace("%", "")
+    try:
+        if float(part.replace(",", ".")) > 0:
+            motif = f"part_ugly_ads : {part}"
+    except ValueError:
+        pass
+    if not motif:
+        style = _sans_accent(str(reponses.get("style_creas") or ""))
+        if "les deux" in style or "ugly" in style:
+            brut = " ".join(str(reponses.get("style_creas") or "").split())
+            motif = f"style_creas : {brut[:160]}"
+
+    # La demande d'ugly ads se cherche ensuite partout ou le client ecrit librement.
     champs = ("style_creas", "notes_libres", "part_ugly_ads", "ambiance",
               "promo", "angles_a_eviter")
-    motif = None
     for champ in champs:
+        if motif:
+            break
         texte = _sans_accent(str(reponses.get(champ) or ""))
         for mot in MOTS_UGLY:
             if _sans_accent(mot) in texte:
