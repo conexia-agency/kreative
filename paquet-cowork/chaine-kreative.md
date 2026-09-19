@@ -30,6 +30,12 @@ soit joint, le brief porte une ligne `_declare_sans_fournir`.
 
 ## 2. La banque de références se lit sous registre
 
+Le skill dit que la banque vit « à côté du SKILL.md ». Dans ce paquet,
+elle vit à la racine, dans `CREAS INSPI DELIVERY`, pas à côté de
+`resources/strategie-creative.md` : ne la cherche pas par chemin relatif
+au fichier du skill. `banque.py ouvrir` donne les chemins exacts de
+chaque planche, et `sante.py` vérifie qu'elle est complète.
+
 Le skill demande d'ouvrir toutes les planches de la famille, d'en retenir une
 vingtaine, et de les ouvrir en pleine résolution avant d'écrire les créas. La
 chaîne rend ce process vérifiable, sans en changer une ligne :

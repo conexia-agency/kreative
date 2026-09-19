@@ -18,6 +18,16 @@ connecteur fixe le modèle et la facturation par ses paramètres d'appel.
 `resources/chaine-kreative.md` dit seulement où la chaîne a déjà déposé les
 fichiers que le skill demande d'aller chercher, et comment sa sortie se range.
 
+## 0. Vérifier les branchements
+
+    python3 scripts/pipeline/sante.py
+
+À jouer en premier, à chaque nouveau poste et à chaque doute. Chaque ligne
+dit ce qui est branché, ce qui manque et le remède. Si le verdict est
+« ne doit pas tourner », on répare avant de produire, on ne contourne pas.
+Le connecteur Higgsfield et le navigateur ne se prouvent qu'en session :
+un appel de solde et une capture du site font foi.
+
 ## 1. Relever les formulaires
 
     python3 scripts/pipeline/zite.py relever

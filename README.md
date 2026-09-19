@@ -96,3 +96,17 @@ pas "bon". Arbitrage commercial, pas technique.
 **Le gate d'audit tourne sur les trois rendus, pas sur le master.** Constaté au premier test :
 une accroche qui respire en 9:16 peut chevaucher le sujet en 1:1, parce que le cadre est plus
 serré. Le risque de collision est donc propre à chaque format.
+
+## Se repérer entre dépôt et paquets
+
+Ce dépôt est la source de vérité, pas le livrable. `paquet/` n'en est que la
+partie rédigée (SKILL.md, changelog, evals) : le skill créatif de Kreative,
+la banque `CREAS INSPI DELIVERY` et les scripts y sont injectés à
+l'assemblage par `python3 outils/empaqueter.py` (paquet Claude Code) ou
+`python3 outils/empaqueter_cowork.py` (paquet Cowork). Un
+`references/strategie-creative.md` absent de `paquet/` est donc normal ici,
+et anormal dans un paquet assemblé.
+
+Sur n'importe quel poste, `python3 pipeline/sante.py` (ou
+`scripts/pipeline/sante.py` depuis un paquet) dit ce qui est branché, ce qui
+manque et le remède, et rend un code 1 si la chaîne ne doit pas tourner.
