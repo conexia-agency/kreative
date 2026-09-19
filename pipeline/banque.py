@@ -28,6 +28,22 @@ process mesurable, en trois temps :
     python3 pipeline/banque.py retenir <ardoise> --refs AG1-07 AG2-10 --du-client AG2-10
     python3 pipeline/banque.py verifier <ardoise>
 
+**Ce que ce controle ne prouve pas, et il faut le savoir.** `lue` est une
+DECLARATION de la session, pas une preuve de lecture. La preuve par le systeme
+de fichiers a ete cherchee et elle n'existe pas ici : la date de dernier acces
+n'est pas mise a jour sur le volume de ce poste, verifie le 19/09 sur une
+planche lue en entier, date inchangee.
+
+Ce qui est reellement attrape : l'ETAPE SAUTEE. Une session qui ne consigne
+rien voit son plan refuse ; une session qui cite une reference qu'elle n'a pas
+retenue se fait nommer la reference ; une session qui invente un identifiant
+se fait refuser parce qu'aucun fichier ne porte ce nom. Ce qui reste possible :
+declarer avoir lu onze planches sans les avoir ouvertes. Ce module transforme
+donc un oubli silencieux en acte explicite et trace, ce qui est un progres
+reel, pas en impossibilite. Le jour ou la difference comptera, la suite est de
+faire decrire le contenu de chaque planche et de le comparer a un index de la
+banque construit une fois.
+
 Cible Python 3.9+. Aucune dependance externe.
 """
 from __future__ import annotations
