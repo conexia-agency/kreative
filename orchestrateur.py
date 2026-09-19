@@ -10,8 +10,7 @@ Un cycle enchaîne les maillons dans l'ordre, sur toutes les commandes concerné
 1. **relevé** : les nouvelles soumissions Zite deviennent des commandes (`zite.py`) ;
 2. **site** : le site du client est aspiré, assets, captures et charte mesurée
    (`scraper.py`, point 4.1 du cahier des charges) ;
-3. **rédaction** : les réponses brutes deviennent un brief moteur (`redaction.py`) ;
-4. **dossier** : l'inventaire de ce qui est sur le disque est écrit (`plan.py`).
+3. **dossier** : l'inventaire de ce qui est sur le disque est écrit (`plan.py`).
 
 **Le cycle s'arrête là, et c'est le coeur du sujet.** La stratégie, les angles,
 la copy et les prompts sont produits par le SKILL de Kreative, dans une session.
@@ -55,7 +54,6 @@ RACINE = Path(__file__).resolve().parent
 sys.path.insert(0, str(RACINE / "pipeline"))
 
 import plan  # noqa: E402
-import redaction  # noqa: E402
 import scraper  # noqa: E402
 import zite  # noqa: E402
 from etat import RACINE_DEFAUT, Commande  # noqa: E402
@@ -196,7 +194,6 @@ def cycle(generer: bool = False, limite: int = 0, pages: int = 25) -> dict:
     except Exception as erreur:  # le relevé ne doit pas empêcher de traiter l'existant
         _journal("echec_releve", erreur=str(erreur)[:200])
 
-    redactions_restantes = limite or 10**9
     for commande in _commandes_zite():
         nom = commande.dossier.name
         etat = commande.donnees.get("etat")
@@ -213,25 +210,17 @@ def cycle(generer: bool = False, limite: int = 0, pages: int = 25) -> dict:
                 bilan["sites_refuses"] += 1
             commande = Commande.charger(nom)
 
-        if etat == "recue" and not brief.get("_redige"):
-            if redactions_restantes <= 0:
-                continue
-            redactions_restantes -= 1
-            try:
-                redaction.rediger(nom)
-                commande = Commande.charger(nom)
-                bilan["redigees"] += 1
-                _journal("brief_redige", commande=nom,
-                         retraits=len(commande.donnees["brief"].get("_retraits", [])))
-            except Exception as erreur:
-                _echouer(commande, "redaction", erreur)
-                bilan["echecs"] += 1
-                continue
+        # La rédaction du brief est SORTIE du cycle le 18/09. Le skill de
+        # Kreative la fait lui-même, c'est son étape 1 : « Cartographier le
+        # brief. Range chaque réponse ». La refaire avant lui avec un autre
+        # appel au modèle produisait une deuxième version du brief, reformulée,
+        # et c'est elle que la suite lisait. `redaction.py` reste dans le
+        # dépôt, appelable à la main, mais plus rien ne le déclenche.
 
         # Le dossier d'entrées : l'inventaire de ce que le skill trouvera sur le
         # disque. C'est le dernier maillon automatisable. Ce qui suit est la
         # création, elle appartient au skill de Kreative et se fait en session.
-        if commande.donnees.get("etat") == "recue" and commande.donnees["brief"].get("_redige"):
+        if commande.donnees.get("etat") == "recue":
             try:
                 entrees = plan.dossier_entrees(commande)
                 plan.ecrire_dossier(commande)

@@ -131,15 +131,27 @@ def c1_copy_peinte(commande: Commande, crea: Crea) -> Optional[Constat]:
     chemin = commande.dossier / crea.master
     if not chemin.exists() or not _tesseract_disponible():
         return None
-    try:
-        brut = subprocess.run(
-            ["tesseract", str(chemin), "-", "-l", "fra+eng", "--psm", "11"],
-            capture_output=True, timeout=90)
-        texte = brut.stdout.decode("utf-8", "replace")
-    except Exception:
-        return None
 
-    lus = set(_normaliser(texte))
+    # Deux modes de segmentation, et on garde l'union. Le mode 11, texte
+    # épars, ne lisait RIEN sur les quatre masters Podmax du 19/09, dont un
+    # chiffre de 900 px de haut, alors que le mode 3, page entière, lisait
+    # tout. Un seul mode produisait donc quatre faux échecs sur quatre créas
+    # correctes, et un gate qui se trompe à ce point apprend à être ignoré.
+    # Le chemin est RESOLU avant d'être passé à tesseract. Sur macOS, /tmp est
+    # un lien vers /private/tmp, et la bibliothèque d'image de tesseract ne le
+    # suit pas : elle répond « image file not found » sur un fichier que Python
+    # vient de lire. Quatre masters Podmax ont ainsi été déclarés sans texte le
+    # 19/09, alors que l'OCR les lisait parfaitement par leur chemin réel.
+    reel = str(chemin.resolve())
+    lus: set = set()
+    for segmentation in ("3", "11"):
+        try:
+            brut = subprocess.run(
+                ["tesseract", reel, "-", "-l", "fra+eng", "--psm", segmentation],
+                capture_output=True, timeout=90)
+            lus |= set(_normaliser(brut.stdout.decode("utf-8", "replace")))
+        except Exception:
+            continue
     attendus = set()
     for champ in (crea.copy.accroche, crea.copy.sous_accroche,
                   crea.copy.cta, crea.copy.badge):
