@@ -93,12 +93,18 @@ ce qui manque et le remède (détail : `references/installation.md`). Verdict
    pages parcourues dans Chromium, charte MESURÉE sur les styles calculés
    (`marque/charte-site.json`), textes (`site.json`), images dédoublonnées et
    indexées (`assets-site/index.json`), candidats logo scorés, une capture
-   par page dans `marque/captures/`. Puis REGARDER ces captures une par une
-   avec l'outil Read : la mesure donne les valeurs, pas le parti pris. Si le
-   site refuse, le motif est écrit dans `marque/scraping.json` : c'est
-   l'arrêt 2 si le brief seul ne porte pas la DA. Le MCP Chrome DevTools ne
-   sert qu'en secours si `scraper.py` échoue, jamais pour lire des fichiers
-   locaux.
+   par page dans `marque/captures/`. `scraper.py` est la RÉCOLTE et la
+   MESURE, obligatoires ; il ne vaut pas analyse : ses captures figent la
+   page au chargement, accordéons fermés, pop-up par-dessus. Ensuite,
+   ANALYSER réellement : ouvrir le site avec le MCP Chrome DevTools, pages
+   produit et FAQ comprises, déplier avant de capturer, relever la DA avec
+   `evaluate_script`, puis tenter la bibliothèque publicitaire Meta (non
+   bloquante : deux essais, on le dit en une ligne, on poursuit). Navigateur
+   indisponible : travailler sur les captures est permis, mais cela se dit à
+   l'utilisateur au moment où cela arrive. Le MCP Chrome ne lit jamais des
+   fichiers locaux. Si le site refuse le scraping, le motif est écrit dans
+   `marque/scraping.json` : c'est l'arrêt 2 si le brief seul ne porte pas
+   la DA.
 3. **Ouvrir la banque de références, sous registre.**
    `python3 scripts/pipeline/banque.py ouvrir <ardoise>` liste la famille et
    les planches. Ouvrir TOUTES les planches listées (outil Read), puis

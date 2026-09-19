@@ -141,14 +141,15 @@ def ardoise(valeur: str) -> str:
 
 @dataclass
 class Copy:
-    """Le texte de la créa. Il ne part JAMAIS dans le prompt du modèle.
+    """Le texte de la créa, tel que le skill l'a écrit.
 
-    Conséquence directe sur le 7.2, cas B. Le CDC décrit la méthode manuelle
-    actuelle : réémettre le prompt complet en ne remplaçant que la phrase entre
-    guillemets, en espérant que le visuel ne bouge pas. Ici le texte n'est pas
-    dans l'image, donc corriger un copy raté ne relance aucune génération : on
-    change le champ et on recompose. Coût nul, résultat déterministe, le visuel
-    validé ne peut pas dériver.
+    Décision du 19/09/2026 : le texte est PEINT par le modèle, comme le veut
+    le skill de Kreative. La copy figure donc mot pour mot dans le prompt
+    (`plan.py` le vérifie), et ces champs restent la source relisible pour
+    l'audit OCR et la page de suivi. Conséquence sur le 7.2 : si le prompt
+    change, l'image ne correspond plus et la créa repart en génération ; si
+    seuls l'angle ou la copy hors prompt bougent, le master validé se
+    conserve (la distinction vit dans `plan.py importer`).
     """
 
     accroche: str = ""

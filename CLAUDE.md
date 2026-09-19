@@ -123,11 +123,10 @@ poursuit. Ce qui n'est pas permis, c'est de ne pas essayer.
 
 ## Le texte peint par le modèle
 
-Le contrat de `pipeline/etat.py` dit que la copy ne part jamais dans le prompt et
-que `compositeur/` la pose ensuite. Ce dossier **n'existe pas** dans le dépôt, et
-`pipeline/plan.py` exige aujourd'hui l'inverse. Tant que les deux se
-contredisent, le signaler à l'utilisateur plutôt que de suivre `plan.py` en
-silence.
+Contradiction levée le 19/09/2026 : la docstring de `pipeline/etat.py` datait
+de l'architecture abandonnée (copy posée par un compositeur). Elle dit
+désormais la même chose que `pipeline/plan.py` : le texte est peint par le
+modèle, la copy figure mot pour mot dans le prompt, et `plan.py` le vérifie.
 
 Tant que le texte est peint, deux précautions :
 

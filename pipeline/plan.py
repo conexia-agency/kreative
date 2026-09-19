@@ -452,7 +452,9 @@ def controler(plan: dict, commande: Commande) -> Tuple[List[dict], List[str], Li
         faute_technique = None
         for motif, quoi in (
             (r"#[0-9A-Fa-f]{6}\s*:", "un code couleur juste avant les deux points"),
-            (r"(?:Poppins|Helvetica|Arial|Inter|Georgia|Roboto)[^:.]{0,30}:",
+            (r"(?:Poppins|Helvetica|Arial|Inter|Georgia|Roboto|DM Sans|Glacial(?:\s+Indifference)?"
+             r"|IBM Plex(?:\s+Mono)?|Montserrat|Lato|Open Sans|Raleway|Oswald|Nunito|Manrope"
+             r"|Space Grotesk|Playfair|Futura|Gotham|Proxima)[^:.]{0,30}:",
              "un nom de police juste avant les deux points"),
             (r"(?i)lorem\s+ipsum", "la mention lorem ipsum"),
         ):
