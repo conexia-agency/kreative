@@ -293,6 +293,47 @@ def retenir(commande: Commande, refs: List[str],
     return etat
 
 
+def extraire(commande: Commande) -> Dict[str, str]:
+    """Donne à chaque référence retenue son fichier à elle, pleine résolution.
+
+    Les fichiers `HD_` de la banque portent DEUX créas côte à côte : une
+    lecture d'image partage donc ses pixels entre les deux, et sur les plus
+    petits fichiers (712 px de large pour deux créas, mesuré), chaque
+    référence descend à ~350 px : on y lit la composition, pas la finition.
+    Ce découpage écrit une image par référence retenue, moitié gauche ou
+    droite selon la position de l'identifiant dans le nom du fichier, dans
+    `session/references/` de la commande. La lecture se fait ensuite une
+    créa par image, avec toute la résolution disponible pour chacune.
+    """
+    from PIL import Image  # local : banque.py reste importable sans Pillow
+
+    etat = _lire_etat(commande)
+    chemins = etat.get("chemins_pleine_resolution") or {}
+    if not chemins:
+        raise RuntimeError("aucune référence retenue : lancer « retenir » d'abord.")
+
+    dossier = commande.dossier / "session" / "references"
+    dossier.mkdir(parents=True, exist_ok=True)
+    sorties: Dict[str, str] = {}
+    for ref, chemin in sorted(chemins.items()):
+        source = Path(chemin)
+        if not source.exists():
+            raise RuntimeError(f"{ref} : fichier disparu, {source}")
+        # HD_<A>_<B>.jpg : A à gauche, B à droite. HD_<A>.jpg : la créa seule.
+        ids = source.stem.replace("HD_", "").split("_")
+        destination = dossier / f"{ref}.jpg"
+        with Image.open(source) as image:
+            if len(ids) == 2 and ref in ids:
+                largeur, hauteur = image.size
+                moitie = (0, 0, largeur // 2, hauteur) if ref == ids[0] \
+                    else (largeur // 2, 0, largeur, hauteur)
+                image.crop(moitie).save(destination, quality=92)
+            else:
+                image.convert("RGB").save(destination, quality=92)
+        sorties[ref] = str(destination)
+    return sorties
+
+
 # ---------------------------------------------------------------------------
 # 3. Verifier : le gate que plan.py appelle
 # ---------------------------------------------------------------------------
@@ -382,6 +423,9 @@ def main() -> int:
     p.add_argument("--du-client", nargs="*", dest="du_client",
                    help="celles qui portent la marque du client du jour")
 
+    p = sous.add_parser("extraire", help="une image par reference retenue, pleine resolution")
+    p.add_argument("ardoise")
+
     p = sous.add_parser("verifier", help="controler que le process a ete suivi")
     p.add_argument("ardoise")
 
@@ -389,6 +433,13 @@ def main() -> int:
 
     try:
         commande = Commande.charger(args.ardoise)
+
+        if args.action == "extraire":
+            sorties = extraire(commande)
+            for ref, chemin in sorties.items():
+                print(f"  {ref}  {chemin}")
+            print(f"{len(sorties)} référence(s) découpée(s), une créa par image : les ouvrir une par une.")
+            return 0
 
         if args.action == "ouvrir":
             print(rapport_ouverture(ouvrir(commande)))

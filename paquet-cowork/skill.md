@@ -52,6 +52,12 @@ Ouvre toutes les planches listées, puis consigne :
 
     python3 scripts/pipeline/banque.py lue <ardoise> --planches ...
     python3 scripts/pipeline/banque.py retenir <ardoise> --refs ... --du-client ...
+    python3 scripts/pipeline/banque.py extraire <ardoise>
+
+`extraire` écrit une image par référence retenue : les fichiers HD de la
+banque portent deux créas côte à côte, et les lire tels quels partage la
+résolution entre les deux. Ouvre les fichiers découpés UN PAR UN : c'est
+là que se lit la finition, pas sur les planches.
 
 Sans ce registre, le plan sera refusé à l'étape 5.
 

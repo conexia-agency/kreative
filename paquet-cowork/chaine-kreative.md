@@ -48,6 +48,13 @@ regardées :
 
     python3 scripts/pipeline/banque.py lue <ardoise> --planches AG1_1 AG1_2 ...
     python3 scripts/pipeline/banque.py retenir <ardoise> --refs AG1-05 AG2-03 ... --du-client <refs>
+    python3 scripts/pipeline/banque.py extraire <ardoise>
+
+La dernière commande découpe chaque référence retenue en un fichier à elle,
+dans `commandes/<ardoise>/session/references/` : une créa par image, toute
+la résolution pour elle. C'est sur ces fichiers, ouverts un par un, que se
+fait la lecture en pleine résolution que le skill exige, jamais sur les
+paires HD ni sur les planches.
 
 `--du-client` liste les références qui portent la marque du client du jour :
 le skill interdit de les reprendre, et le plan sera refusé si l'une d'elles
