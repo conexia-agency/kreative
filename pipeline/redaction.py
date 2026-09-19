@@ -42,7 +42,32 @@ sys.path.insert(0, str(RACINE / "pipeline"))
 
 from etat import Commande  # noqa: E402
 
-SKILL = RACINE / "skill" / "strategie-creative-SKILL.md"
+def _fichier_skill() -> Path:
+    """Le skill de stratégie, aux deux emplacements possibles.
+
+    Dépôt de développement : `skill/SKILL.md`. Skill installé (dossier
+    empaqueté) : `references/strategie-creative.md`. Le premier trouvé gagne ;
+    aucun des deux n'est une erreur silencieuse, l'appelant échoue en clair.
+    """
+    # RACINE est le dossier du code. Dans le dépôt de développement, le skill
+    # de stratégie vit dans skill/. Dans le paquet installé, le code est dans
+    # scripts/ et le skill dans references/, un niveau au-dessus.
+    for chemin in (RACINE / "skill" / "SKILL.md",
+                   RACINE / "skill" / "strategie-creative-SKILL.md",
+                   RACINE / "references" / "strategie-creative.md",
+                   RACINE.parent / "references" / "strategie-creative.md",
+                   # Paquet Cowork : le skill du client vit dans resources/.
+                   RACINE / "resources" / "strategie-creative.md",
+                   RACINE.parent / "resources" / "strategie-creative.md",
+                   RACINE.parent.parent / "resources" / "strategie-creative.md"):
+        if chemin.is_file():
+            return chemin
+    raise FileNotFoundError(
+        "skill de stratégie introuvable : ni skill/SKILL.md, ni "
+        "references/strategie-creative.md à côté du code")
+
+
+SKILL = _fichier_skill()
 DELAI_REDACTION = 600
 
 # Le tiret cadratin, écrit par son code pour que ce fichier n'en contienne aucun.

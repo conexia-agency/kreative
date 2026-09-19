@@ -25,13 +25,21 @@ Cible Python 3.9+. Aucune dépendance externe.
 from __future__ import annotations
 
 import json
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 RACINE = Path(__file__).resolve().parent.parent
-JOURNAL_COUTS = RACINE / "commandes" / "_couts" / "couts-observes.jsonl"
+sys.path.insert(0, str(RACINE / "pipeline"))
+
+from etat import RACINE_DEFAUT  # noqa: E402
+
+# Le journal vit avec les DONNÉES, pas avec le code : dans un skill installé,
+# le dossier du code est immuable et c'est l'espace de travail qui reçoit
+# l'observé (voir etat._racine_travail).
+JOURNAL_COUTS = RACINE_DEFAUT / "_couts" / "couts-observes.jsonl"
 
 # Écart toléré entre le prix affiché et le prix mesuré, en proportion. Au delà,
 # la table est réputée périmée et le devis porte une alerte.
@@ -49,10 +57,13 @@ class Tarif:
 
     `base` : le prix en texte vers image, réglages par défaut.
 
-    `i2i` : le prix quand une image de référence est jointe. Nano Banana Pro
-    passe de 2 à 4 crédits, mesuré le 08/09 sur le lot ATCLUB (22 crédits pour
-    5 générations t2i et 3 i2i). Une chaîne qui compose ses produits en i2i,
-    comme la nôtre, paie donc le double de ce qu'un devis naïf annonce.
+    `i2i` : le prix quand une image de référence est jointe, POUR LES MODÈLES
+    QUI LE SURFACTURENT. Nano Banana Pro ne le fait pas : 2 crédits avec ou
+    sans référence, mesuré le 17/09 sur le relevé ligne par ligne du lot
+    Podmax. L'ancienne valeur de 4, lue le 08/09 sur un simple écart de solde,
+    était fausse : le solde bougeait aussi pour des vidéos lancées en
+    parallèle. Joindre un asset réel du client ne coûte donc rien de plus, et
+    aucun texte de la chaîne ne doit en dissuader.
 
     `paliers` : le prix par couple qualité/résolution, pour les modèles qui en
     exposent. MS Image va de 0,5 à 7 crédits, soit un facteur quatorze.

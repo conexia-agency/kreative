@@ -110,6 +110,14 @@ CHAMPS_TEXTE: Dict[str, str] = {
     "yatilautrechosequenousdevonssavoir": "notes_libres",
     "queltonvoulezvous": "ton",
     "preferezvousquonsadresse": "adresse",
+    # Le style de créas et sa répartition chiffrée décident de la famille de la
+    # banque de références : UGLY ADS ne s'ouvre QUE sur demande explicite du
+    # client, et c'est ici qu'elle se lit. Ces trois champs se perdaient
+    # silencieusement (mesuré le 18/09 sur MICKAEL WU BUSINESS, qui demandait
+    # 60 % d'ugly ads sans que la stratégie puisse jamais le savoir).
+    "quelstyledecreas": "style_creas",
+    "adsclassiques": "part_ads_classiques",
+    "uglyads": "part_ugly_ads",
 }
 
 # Pièces jointes : libellé normalisé vers catégorie d'asset.
@@ -214,6 +222,25 @@ def lire_soumission(soumission: dict) -> Tuple[Dict[str, str], Dict[str, List[di
     return textes, fichiers
 
 
+# Les trois questions d'identité du formulaire. Elles ne décrivent pas la
+# marque, elles nomment la personne qui recevra le pack.
+CHAMPS_CONTACT: Dict[str, str] = {
+    "quelestvotrenometprenom": "nom",
+    "quelestvotreemail": "email",
+    "quelestvotrenumerodetelephone": "telephone",
+}
+
+
+def _contact(soumission: dict) -> dict:
+    releve: Dict[str, str] = {}
+    for question in soumission.get("questions", []) or []:
+        champ = _correspond(normaliser(question.get("name") or ""), CHAMPS_CONTACT)
+        valeur = question.get("value")
+        if champ and isinstance(valeur, str) and valeur.strip():
+            releve[champ] = valeur.strip()
+    return releve
+
+
 def vers_brief(soumission: dict, pack: str) -> Tuple[dict, List[str]]:
     """Construit le brief du moteur. Retourne le brief et la liste de ce qui manque."""
     textes, fichiers = lire_soumission(soumission)
@@ -234,6 +261,15 @@ def vers_brief(soumission: dict, pack: str) -> Tuple[dict, List[str]]:
         "marque": (textes.get("marque") or "").strip(),
         "url_site": (textes.get("url_site") or "").strip(),
         "pack": pack,
+        # Les coordonnées, relevées à part. Elles ne servent qu'à savoir à qui
+        # remettre le pack : l'article 6 demande une notification à la création
+        # du dossier, et sans adresse il n'y a personne à prévenir. Elles se
+        # perdaient entièrement jusqu'au 18/09.
+        #
+        # Elles vivent HORS de `reponses`, et ce n'est pas du rangement : le
+        # bloc `reponses` part au modèle qui rédige le brief. Des données
+        # personnelles n'ont rien à y faire.
+        "_contact": _contact(soumission),
         "verticale": verticale,
         "secteur_declare": secteur,
         # Réponses brutes, dans les mots du client. Voir la docstring : pas de
@@ -243,6 +279,34 @@ def vers_brief(soumission: dict, pack: str) -> Tuple[dict, List[str]]:
     }
     if ecart:
         brief["_verticale_approchee"] = ecart
+
+    # Les questions « Avez-vous ... ? » sont des aiguillages du formulaire : elles
+    # ouvrent ou ferment la question suivante et ne portent aucune information par
+    # elles-mêmes. Elles en portent UNE, pourtant, et elle est précieuse : quand le
+    # client répond oui et ne fournit rien derrière. Mesuré le 18/09 sur MICKAEL WU
+    # BUSINESS, qui déclare avoir une identité visuelle et ne joint aucun fichier :
+    # la stratégie a composé sans logo ni charte sans que rien ne le signale.
+    annonces = {
+        "avezvousunlogo": "logo",
+        "avezvousuneidentitevisuelle": "identité visuelle",
+        "avezvousunechartegraphique": "charte graphique",
+        "avezvousdesphotoslifestyle": "photos lifestyle",
+        "avezvousdesphotosproduit": "photos produit",
+        "avezvousdesexemplesdecreativesquevousaimez": "créas aimées",
+        "avezvousdesexemplesdecreativesquevousnaimezpas": "créas rejetées",
+    }
+    declare_sans_fournir = []
+    for question in soumission.get("questions", []) or []:
+        libelle = normaliser(question.get("name") or "")
+        valeur = str(question.get("value") or "").strip().lower()
+        if valeur != "oui":
+            continue
+        for prefixe, quoi in annonces.items():
+            if libelle.startswith(prefixe):
+                declare_sans_fournir.append(quoi)
+                break
+    if declare_sans_fournir:
+        brief["_declare_sans_fournir"] = declare_sans_fournir
 
     for champ in ("marque", "url_site"):
         if not brief[champ]:

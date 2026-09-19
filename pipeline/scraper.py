@@ -194,6 +194,14 @@ LECTURE_PAGE = r"""
   };
 
   // Images : balises img et picture, fonds CSS, posters vidéo.
+  const versRacine = (el) => {
+    const a = el.closest('a[href]');
+    if (!a) return false;
+    try {
+      const u = new URL(a.getAttribute('href'), location.href);
+      return u.origin === location.origin && (u.pathname === '/' || u.pathname === '');
+    } catch (e) { return false; }
+  };
   const images = [];
   document.querySelectorAll('img').forEach(img => {
     const src = absolue(plusGrandSrcset(img.getAttribute('srcset')) || img.currentSrc || img.src);
@@ -202,6 +210,7 @@ LECTURE_PAGE = r"""
     images.push({ src, alt: img.alt || '', type: 'img', zone: zone(img),
       largeur: img.naturalWidth, hauteur: img.naturalHeight,
       affichee: [Math.round(r.width), Math.round(r.height)],
+      lien_racine: versRacine(img),
       attributs: ((img.className || '') + ' ' + (img.id || '') + ' ' + (img.alt || '')).toLowerCase() });
   });
   document.querySelectorAll('picture source[srcset]').forEach(s => {
@@ -320,15 +329,156 @@ LECTURE_PAGE = r"""
   const policesChargees = [];
   try { document.fonts.forEach(f => { if (f.status === 'loaded') policesChargees.push(`${f.family} ${f.weight} ${f.style}`); }); } catch (e) {}
 
-  // Composants : cartes, pastilles, ombres, rayons.
-  const composants = { rayons: {}, ombres: {}, bordures: {} };
-  document.querySelectorAll('div, section, article, li, a, span').forEach(el => {
+  // Composants. L'article 4.1 du cahier des charges nomme ce qu'il veut voir
+  // relevé : « badges, pilules, cartes empilées, pastilles, police d'accent,
+  // encadrés tracés à la main, traitement des ombres et des bordures ». Neuf
+  // items ; le relevé n'en donnait que trois, et deux sous forme de compteurs
+  // bruts. Tout se mesure ici sur les styles CALCULES, comme le reste du
+  // fichier : c'est la seule façon d'avoir la valeur réellement affichée.
+  const composants = { rayons: {}, ombres: {}, bordures: {},
+                       badges: [], cartes: [], pastilles: [],
+                       cartes_empilees: 0, encadres_dessines: [] };
+  const opaqueDe = (s) => {
+    const f = s.backgroundColor;
+    return !!f && f !== 'transparent' && !/rgba\([^)]*,\s*0\s*\)$/.test(f);
+  };
+  // Décompose une ombre CSS en ses nombres et sa couleur, et dit si c'est une
+  // LUEUR (posée droit, sans décalage, large) ou une OMBRE PORTEE. Les deux ne
+  // se dessinent pas pareil dans une créa, et « box-shadow: ... » brut ne le
+  // disait pas.
+  const lireOmbre = (valeur) => {
+    const couleur = (valeur.match(/(rgba?\([^)]*\)|#[0-9a-f]{3,8})/i) || [''])[0];
+    const nombres = (valeur.replace(couleur, '').match(/-?\d*\.?\d+px/g) || [])
+      .map(v => parseFloat(v));
+    const [dx = 0, dy = 0, flou = 0, etalement = 0] = nombres;
+    const lueur = Math.abs(dx) < 2 && Math.abs(dy) < 2 && flou >= 12;
+    return { couleur, dx, dy, flou, etalement, nature: lueur ? 'lueur' : 'ombre portée' };
+  };
+  // La couleur du TEXTE, lue sur l'élément qui le porte vraiment. Un badge est
+  // souvent un conteneur dont la couleur est héritée et fausse : podmax
+  // ressortait « encre noire sur fond rgb(38,36,41) », c'est-à-dire du noir sur
+  // du noir, ce qui n'existe pas à l'écran. Une valeur fausse dans une charte
+  // est pire qu'une valeur absente : elle se retrouve telle quelle dans un
+  // prompt.
+  const encreDe = (el) => {
+    const porteur = Array.from(el.querySelectorAll('*'))
+      .find(n => n.children.length === 0 && (n.textContent || '').trim());
+    return getComputedStyle(porteur || el).color;
+  };
+  const rectsCartes = [];
+  document.querySelectorAll('div, section, article, li, a, span, p, h1, h2, h3').forEach(el => {
     const s = getComputedStyle(el), r = el.getBoundingClientRect();
-    if (r.width < 24 || r.height < 16) return;
-    if (s.borderRadius && s.borderRadius !== '0px') composants.rayons[s.borderRadius] = (composants.rayons[s.borderRadius] || 0) + 1;
-    if (s.boxShadow && s.boxShadow !== 'none') composants.ombres[s.boxShadow] = (composants.ombres[s.boxShadow] || 0) + 1;
-    if (s.borderStyle !== 'none' && s.borderWidth !== '0px') composants.bordures[`${s.borderWidth} ${s.borderStyle}`] = (composants.bordures[`${s.borderWidth} ${s.borderStyle}`] || 0) + 1;
+    if (r.width < 8 || r.height < 8) return;
+    const rayon = parseFloat(s.borderTopLeftRadius) || 0;
+    const texte = (el.innerText || '').trim();
+
+    if (r.width >= 24 && r.height >= 16) {
+      if (s.borderRadius && s.borderRadius !== '0px') composants.rayons[s.borderRadius] = (composants.rayons[s.borderRadius] || 0) + 1;
+      if (s.boxShadow && s.boxShadow !== 'none') composants.ombres[s.boxShadow] = (composants.ombres[s.boxShadow] || 0) + 1;
+      // La bordure se lit côté par côté : un `border-style` global rend
+      // « none none solid none » sur un simple filet bas, et la couleur, qui
+      // est ce qui sert vraiment dans une créa, se perdait entièrement.
+      ['Top', 'Right', 'Bottom', 'Left'].forEach(cote => {
+        const largeur = parseFloat(s[`border${cote}Width`]) || 0;
+        const style = s[`border${cote}Style`];
+        if (largeur <= 0 || style === 'none') return;
+        const cle = `${largeur}px ${style} ${s[`border${cote}Color`]}`;
+        composants.bordures[cle] = (composants.bordures[cle] || 0) + 1;
+      });
+    }
+
+    // Badge ou pilule : petit, très arrondi, fond plein, texte court.
+    // Un badge porte UN texte court sur une ligne. Le retour à la ligne
+    // trahit un conteneur qui empile deux blocs : podmax sortait « À l'unité
+    // / Nos packs » comme un seul badge de 160px de rayon.
+    if (texte && texte.length <= 32 && !texte.includes('\n')
+        && r.height >= 14 && r.height <= 60
+        && r.width <= 300 && rayon >= r.height / 2 - 1 && opaqueDe(s)
+        && !el.querySelector('img, svg, input')) {
+      composants.badges.push({ texte: texte.slice(0, 32), rayon: Math.round(rayon),
+        hauteur: Math.round(r.height), fond: s.backgroundColor, encre: encreDe(el),
+        graisse: s.fontWeight, casse: s.textTransform });
+    }
+
+    // Pastille : carrée ou ronde, petite, qui porte une icône ou un chiffre.
+    const carre = r.height > 0 && r.width / r.height > 0.8 && r.width / r.height < 1.25;
+    if (carre && r.width >= 16 && r.width <= 88 && rayon >= r.width * 0.35
+        && (opaqueDe(s) || el.querySelector('svg, img'))) {
+      composants.pastilles.push({ taille: Math.round(r.width),
+        rayon: Math.round(rayon), fond: s.backgroundColor,
+        contenu: el.querySelector('svg') ? 'icone' : (texte.slice(0, 8) || 'vide'),
+        ronde: rayon >= r.width * 0.45 });
+    }
+
+    // Carte : assez grande, arrondie, détachée du fond par une ombre ou un filet.
+    const detachee = (s.boxShadow && s.boxShadow !== 'none')
+      || (parseFloat(s.borderTopWidth) || 0) > 0 || opaqueDe(s);
+    if (r.width >= 160 && r.height >= 110 && rayon >= 4 && detachee && texte.length > 8) {
+      composants.cartes.push({ largeur: Math.round(r.width), hauteur: Math.round(r.height),
+        rayon: Math.round(rayon), fond: s.backgroundColor,
+        ombre: s.boxShadow === 'none' ? null : lireOmbre(s.boxShadow) });
+      rectsCartes.push(r);
+    }
   });
+
+  // Cartes empilées : deux cartes dont les rectangles se recouvrent
+  // franchement. C'est la profondeur en calques que le skill appelle de ses
+  // voeux, et elle ne se voit pas dans une liste de rayons.
+  for (let i = 0; i < rectsCartes.length && composants.cartes_empilees < 40; i++) {
+    for (let j = i + 1; j < rectsCartes.length; j++) {
+      const a = rectsCartes[i], b = rectsCartes[j];
+      const large = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const haut = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      const aire = large * haut;
+      const petite = Math.min(a.width * a.height, b.width * b.height);
+      if (petite > 0 && aire / petite > 0.12 && aire / petite < 0.95) {
+        composants.cartes_empilees++;
+        break;
+      }
+    }
+  }
+
+  // Encadré tracé à la main : un SVG dont le chemin est courbe, posé autour ou
+  // derrière un bloc de texte. C'est le trait de surligneur, le cercle au
+  // feutre, la flèche dessinée. Un rectangle CSS ne produit jamais ça.
+  document.querySelectorAll('svg').forEach(svg => {
+    const r = svg.getBoundingClientRect();
+    if (r.width < 40 || r.height < 12) return;
+    const chemins = Array.from(svg.querySelectorAll('path'));
+    const courbe = chemins.find(p => {
+      const d = p.getAttribute('d') || '';
+      return d.length > 40 && /[CcQqSsTtAa]/.test(d);
+    });
+    if (!courbe) return;
+    const dessous = document.elementFromPoint(
+      Math.min(window.innerWidth - 1, Math.max(0, r.left + r.width / 2)),
+      Math.min(window.innerHeight - 1, Math.max(0, r.top + r.height / 2)));
+    const pres_de_texte = !!(dessous && (dessous.innerText || '').trim().length > 2);
+    if (!pres_de_texte && r.width > 200 && r.height > 200) return;
+    const trait = getComputedStyle(courbe);
+    composants.encadres_dessines.push({
+      largeur: Math.round(r.width), hauteur: Math.round(r.height),
+      trait: trait.stroke, epaisseur: trait.strokeWidth,
+      rempli: trait.fill && trait.fill !== 'none',
+      autour_de_texte: pres_de_texte });
+  });
+
+  // Police d'accent : une famille employée sur une petite part du texte, et
+  // différente de la police de corps. C'est elle qui porte le mot pivot d'une
+  // créa ; la confondre avec la police de corps aplatit toute la typographie.
+  const parFamille = {};
+  document.querySelectorAll('h1, h2, h3, h4, p, li, span, a, button, strong, em').forEach(el => {
+    const t = (el.innerText || '').trim();
+    if (!t || el.children.length > 0) return;
+    const f = getComputedStyle(el).fontFamily;
+    parFamille[f] = (parFamille[f] || 0) + t.length;
+  });
+  const totalTexte = Object.values(parFamille).reduce((a, b) => a + b, 0) || 1;
+  const familleCorps = getComputedStyle(corpsReel).fontFamily;
+  composants.familles = Object.entries(parFamille)
+    .map(([famille, signes]) => ({ famille, signes, part: signes / totalTexte,
+      accent: famille !== familleCorps && signes / totalTexte < 0.1 }))
+    .sort((a, b) => b.signes - a.signes).slice(0, 8);
   const variables = {};
   try {
     for (const feuille of document.styleSheets) {
@@ -409,14 +559,77 @@ LECTURE_PAGE = r"""
 # ---------------------------------------------------------------------------
 
 def _defiler(page) -> None:
-    """Descend la page par paliers pour déclencher le chargement paresseux des images."""
-    hauteur = page.evaluate("document.documentElement.scrollHeight")
+    """Descend la page pour déclencher le chargement paresseux des images.
+
+    Deux mécaniques, parce qu'une seule ne suffit pas : `window.scrollTo` pour
+    les pages qui défilent normalement, et la MOLETTE pour celles dont le
+    défilement vit dans un conteneur interne (Framer, Webflow et consorts).
+    Sur ces dernières, `document.documentElement.scrollHeight` vaut la hauteur
+    du viewport et l'ancienne boucle ne défilait pas d'un pixel : le lazy-load
+    ne partait pas, et la capture ne voyait que le premier écran (mesuré le
+    18/09 sur podmax.fr et mickaelwu.com)."""
+    hauteur = page.evaluate("document.documentElement.scrollHeight") or 0
     pas = 900
-    for y in range(0, min(hauteur, 30000), pas):
+    for y in range(0, min(max(hauteur, pas), 30000), pas):
         page.evaluate(f"window.scrollTo(0, {y})")
         page.wait_for_timeout(120)
+    vue = page.viewport_size or {"width": 1440, "height": 900}
+    page.mouse.move(vue["width"] // 2, vue["height"] // 2)
+    for _ in range(12):
+        page.mouse.wheel(0, vue["height"])
+        page.wait_for_timeout(140)
     page.evaluate("window.scrollTo(0, 0)")
+    page.mouse.wheel(0, -30000)
     page.wait_for_timeout(400)
+
+
+def _capturer_entier(page, chemin: Path, hauteur_max: int) -> None:
+    """Écrit une capture de la page ENTIÈRE, quel que soit son mode de défilement.
+
+    `full_page=True` suffit pour une page qui défile normalement. Il rend le
+    seul premier écran (1440 x 900) quand le défilement vit dans un conteneur
+    interne : la chaîne jugeait alors la direction artistique sur le haut des
+    pages, sans que rien ne le signale. On prend dans ce cas des bandes
+    successives à la molette, qui fait défiler ce qui est réellement sous le
+    curseur, et on les assemble. La fin se détecte à l'identité de deux
+    clichés consécutifs."""
+    import io
+    from PIL import Image
+
+    vue = page.viewport_size or {"width": 1440, "height": 900}
+    page.evaluate("window.scrollTo(0, 0)")
+    page.mouse.move(vue["width"] // 2, vue["height"] // 2)
+    page.mouse.wheel(0, -30000)
+    page.wait_for_timeout(500)
+
+    entiere = page.screenshot(full_page=True, type="jpeg", quality=82)
+    with Image.open(io.BytesIO(entiere)) as im:
+        if im.height > vue["height"] + 100:
+            chemin.write_bytes(entiere)
+            return
+
+    bandes: List[bytes] = []
+    precedent: Optional[bytes] = None
+    for _ in range(max(1, hauteur_max // vue["height"])):
+        cliche = page.screenshot(type="jpeg", quality=82)
+        if cliche == precedent:
+            break
+        bandes.append(cliche)
+        precedent = cliche
+        page.mouse.wheel(0, vue["height"])
+        page.wait_for_timeout(450)
+
+    if len(bandes) <= 1:
+        chemin.write_bytes(bandes[0] if bandes else entiere)
+        return
+
+    images = [Image.open(io.BytesIO(b)).convert("RGB") for b in bandes]
+    planche = Image.new("RGB", (images[0].width, sum(i.height for i in images)))
+    y = 0
+    for im in images:
+        planche.paste(im, (0, y))
+        y += im.height
+    planche.save(chemin, "JPEG", quality=82)
 
 
 def _pages_du_sitemap(contexte, base: str, limite: int) -> List[str]:
@@ -584,10 +797,69 @@ def synthese_charte(lectures: List[dict]) -> dict:
         c = Counter(b.get(cle) for b in boutons if b.get(cle))
         return c.most_common(1)[0][0] if c else None
 
-    composants: Dict[str, Counter] = {"rayons": Counter(), "ombres": Counter(), "bordures": Counter()}
+    # Les composants arrivent sous deux formes selon leur nature. Les rayons,
+    # ombres et bordures sont des COMPTEURS de valeurs CSS : on les cumule. Les
+    # badges, pastilles, cartes, encadrés dessinés et familles de police sont
+    # des RELEVES d'objets réels : on les collecte, on les dédoublonne, et on
+    # garde les plus fréquents. Les écraser dans un compteur, comme le faisait
+    # la boucle précédente, aurait perdu leur contenu.
+    compteurs: Dict[str, Counter] = {"rayons": Counter(), "ombres": Counter(),
+                                     "bordures": Counter()}
+    releves: Dict[str, List[dict]] = {"badges": [], "pastilles": [], "cartes": [],
+                                      "encadres_dessines": [], "familles": []}
+    empilees = 0
     for lecture in lectures:
-        for type_, valeurs in lecture.get("composants", {}).items():
-            composants[type_].update(valeurs)
+        bloc = lecture.get("composants") or {}
+        for type_, compteur in compteurs.items():
+            compteur.update(bloc.get(type_) or {})
+        for type_, liste in releves.items():
+            liste.extend(bloc.get(type_) or [])
+        empilees += int(bloc.get("cartes_empilees") or 0)
+
+    def _resumer(objets: List[dict], cle_signature, garder: int) -> List[dict]:
+        """Dédoublonne des objets identiques et compte leurs occurrences."""
+        vus: Dict[str, dict] = {}
+        for objet in objets:
+            if not isinstance(objet, dict):
+                continue
+            signature = cle_signature(objet)
+            entree = vus.setdefault(signature, dict(objet, occurrences=0))
+            entree["occurrences"] += 1
+        return sorted(vus.values(), key=lambda o: -o["occurrences"])[:garder]
+
+    familles_cumul: Dict[str, dict] = {}
+    for f in releves["familles"]:
+        entree = familles_cumul.setdefault(f["famille"], {"famille": f["famille"], "signes": 0})
+        entree["signes"] += int(f.get("signes") or 0)
+    total_signes = sum(f["signes"] for f in familles_cumul.values()) or 1
+    familles_triees = sorted(familles_cumul.values(), key=lambda f: -f["signes"])
+    famille_corps = familles_triees[0]["famille"] if familles_triees else ""
+    for f in familles_triees:
+        f["part"] = round(f["signes"] / total_signes, 4)
+        f["accent"] = f["famille"] != famille_corps and f["part"] < 0.1
+
+    composants = {
+        # Les trois compteurs historiques, inchangés dans leur forme.
+        "rayons": [{"valeur": v, "occurrences": n} for v, n in compteurs["rayons"].most_common(6)],
+        "ombres": [{"valeur": v, "occurrences": n, **_lire_ombre(v)}
+                   for v, n in compteurs["ombres"].most_common(6)],
+        "bordures": [{"valeur": v, "occurrences": n}
+                     for v, n in compteurs["bordures"].most_common(8)],
+        # Les six items que l'article 4.1 nomme et que le relevé ne donnait pas.
+        "badges": _resumer(releves["badges"],
+                           lambda b: f"{b.get('fond')}|{b.get('rayon')}|{b.get('casse')}", 12),
+        "pastilles": _resumer(releves["pastilles"],
+                              lambda p: f"{p.get('taille')}|{p.get('fond')}|{p.get('ronde')}", 10),
+        "cartes": _resumer(releves["cartes"],
+                           lambda c: f"{c.get('rayon')}|{c.get('fond')}|"
+                                     f"{(c.get('ombre') or {}).get('nature')}", 10),
+        "cartes_empilees": empilees,
+        "encadres_dessines": _resumer(
+            releves["encadres_dessines"],
+            lambda e: f"{e.get('trait')}|{e.get('epaisseur')}|{e.get('rempli')}", 8),
+        "familles_de_police": familles_triees[:8],
+        "police_accent": next((f["famille"] for f in familles_triees if f["accent"]), None),
+    }
 
     variables: Dict[str, str] = {}
     for lecture in lectures:
@@ -606,9 +878,27 @@ def synthese_charte(lectures: List[dict]) -> dict:
             "ombre": dominant("ombre"), "bordure": dominant("bordure"),
             "exemples": list(dict.fromkeys(b["label"] for b in boutons))[:15],
         },
-        "composants": {k: [{"valeur": v, "occurrences": n} for v, n in c.most_common(6)]
-                       for k, c in composants.items()},
+        "composants": composants,
         "variables_css": dict(list(variables.items())[:120]),
+    }
+
+
+def _lire_ombre(valeur: str) -> dict:
+    """Décompose une ombre CSS : décalage, flou, étalement, couleur, nature.
+
+    L'article 4.1 demande le « traitement des ombres », pas la liste des
+    chaînes `box-shadow`. La distinction qui compte pour une créa est entre une
+    LUEUR (posée droit, sans décalage, large) et une OMBRE PORTEE : les deux se
+    dessinent différemment, et la chaîne brute ne le disait pas.
+    """
+    couleur = re.search(r"rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}", valeur or "")
+    reste = (valeur or "").replace(couleur.group(0), "") if couleur else (valeur or "")
+    nombres = [float(n) for n in re.findall(r"-?\d*\.?\d+(?=px)", reste)]
+    dx, dy, flou, etalement = (nombres + [0.0, 0.0, 0.0, 0.0])[:4]
+    return {
+        "couleur": couleur.group(0) if couleur else None,
+        "decalage_x": dx, "decalage_y": dy, "flou": flou, "etalement": etalement,
+        "nature": "lueur" if abs(dx) < 2 and abs(dy) < 2 and flou >= 12 else "ombre portée",
     }
 
 
@@ -636,16 +926,66 @@ def variante_luminance(fichier: Path) -> Optional[str]:
         return None
 
 
-def _score_logo(image: dict) -> int:
+def _est_photographique(chemin: Path) -> bool:
+    """Une photo, ou un aplat de marque ? Un logo compte peu de couleurs.
+
+    Mesuré le 18/09 sur mickaelwu.com : la photo d'avatar carrée posée en
+    en-tête, présente sur toutes les pages, raflait la première place du
+    classement logo. Posée comme logo dans une créa, elle aurait mis un
+    portrait à la place d'un sigle. Un logo, même dégradé, tient en quelques
+    centaines de teintes une fois quantifié ; une photographie en compte des
+    milliers."""
+    try:
+        from PIL import Image
+        with Image.open(chemin) as im:
+            reduite = im.convert("RGB").resize((96, 96), Image.LANCZOS)
+        teintes = {(r // 16, v // 16, b // 16) for r, v, b in reduite.getdata()}
+        return len(teintes) > 180
+    except Exception:
+        return False
+
+
+def _score_logo(image: dict, nb_pages: int = 1) -> int:
+    """Un logo se reconnaît d'abord à sa STRUCTURE, pas à son nom.
+
+    Mesuré le 18/09 sur podmax.fr : le logo est une image Framer sans le mot
+    « logo » nulle part (132 x 38, en tête de toutes les pages, cliquable vers
+    l'accueil), et le score purement nominal le laissait à zéro, donc
+    `logo/candidats.json` vide. Les signaux de structure, indépendants du
+    nommage : cliquable vers la racine, présent sur presque toutes les pages,
+    silhouette de wordmark (petit et nettement plus large que haut)."""
     score = 0
-    if "logo" in image.get("attributs", ""):
+    attributs = image.get("attributs", "") or ""
+    src = (image.get("src") or image.get("source") or "").lower()
+    if "logo" in attributs:
         score += 50
+    if "logo" in src:
+        score += 25
     if image.get("zone") == "entete":
         score += 30
-    if image.get("src", "").lower().endswith(".svg"):
+    elif image.get("zone") == "heros":
+        score += 10
+    if src.endswith(".svg"):
         score += 15
-    if "logo" in image.get("src", "").lower():
+    if image.get("lien_racine"):
+        score += 30
+    if image.get("type") == "icone":
         score += 25
+    pages = image.get("pages")
+    if pages is not None and nb_pages > 1 and len(pages) >= max(2, round(0.8 * nb_pages)):
+        score += 25
+    affichee = (image.get("affichee") or [0, 0]) + [0, 0]
+    la, ha = affichee[0], affichee[1]
+    if 0 < ha <= 90 and la >= 1.8 * ha:
+        score += 20
+    # Une photo pleine page n'est jamais un logo, quel que soit son nom.
+    if ha > 400 or (image.get("hauteur") or 0) > 1200:
+        score -= 30
+    # Trop petit pour être posé sur une créa : une vignette de 64 pixels ne se
+    # rattrape pas, elle se déclasse pour que le vrai logo passe devant.
+    intrinseque = max(image.get("largeur") or 0, image.get("hauteur") or 0)
+    if 0 < intrinseque < 96 and not src.endswith(".svg"):
+        score -= 40
     return score
 
 
@@ -739,11 +1079,7 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
             slug = _slug(page.url)
             capture = sortie / "captures" / f"{len(pages_lues):02d}-{slug}.jpg"
             try:
-                if lecture.get("hauteur", 0) <= CAPTURE_HAUTEUR_MAX:
-                    page.screenshot(path=str(capture), full_page=True, type="jpeg", quality=82)
-                else:
-                    page.screenshot(path=str(capture), type="jpeg", quality=82,
-                                    clip={"x": 0, "y": 0, "width": 1440, "height": CAPTURE_HAUTEUR_MAX})
+                _capturer_entier(page, capture, CAPTURE_HAUTEUR_MAX)
             except Exception as erreur:
                 erreurs.append(f"capture {slug} : {str(erreur)[:120]}")
 
@@ -793,7 +1129,20 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
                 entree["pages"].append(url_page)
 
         for lecture in lectures:
-            for image in lecture.get("images", []):
+            # Les icônes déclarées et l'og:image sont souvent la seule version
+            # propre du sigle de la marque (une apple-touch-icon en 512 est un
+            # logo carré prêt à poser). Elles étaient collectées dans la page
+            # mais jamais téléchargées (constaté le 18/09) : elles rejoignent
+            # ici la file des images, avec leur type pour le score.
+            a_descendre = list(lecture.get("images", []))
+            for logo_page in lecture.get("logos", []):
+                if logo_page.get("type") in ("icone", "og-image") and logo_page.get("src"):
+                    a_descendre.append({
+                        "src": logo_page["src"], "alt": "", "type": logo_page["type"],
+                        "zone": "entete", "largeur": 0, "hauteur": 0,
+                        "affichee": [0, 0], "lien_racine": False,
+                        "attributs": logo_page["type"]})
+            for image in a_descendre:
                 src = image.get("src")
                 if not src or src in ignorees:
                     continue
@@ -809,7 +1158,15 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
                 except Exception:
                     ignorees.add(src)
                     continue
-                if len(contenu) < 1500:
+                # Le plancher de poids écarte les pixels de suivi et les puces
+                # décoratives. Il ne s'applique PAS à un SVG ni à une icône
+                # déclarée : un logo vectoriel propre pèse souvent moins d'un
+                # kilo-octet, et c'est justement l'asset le plus utile du site.
+                vectoriel = src.lower().split("?")[0].endswith(".svg")
+                if len(contenu) < 1500 and not vectoriel and image.get("type") != "icone":
+                    ignorees.add(src)
+                    continue
+                if len(contenu) < 120:
                     ignorees.add(src)
                     continue
 
@@ -817,6 +1174,14 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
                 if empreinte in index:
                     par_source[src] = empreinte
                     _noter_page(index[empreinte], lecture["url"])
+                    # Les signaux de structure se cumulent entre occurrences :
+                    # le logo peut être cliquable en tête et nu dans le pied.
+                    if image.get("lien_racine"):
+                        index[empreinte]["lien_racine"] = True
+                    if image.get("zone") == "entete":
+                        index[empreinte]["zone"] = "entete"
+                    if not any(index[empreinte].get("affichee") or []):
+                        index[empreinte]["affichee"] = image.get("affichee")
                     continue
 
                 type_mime = (reponse.headers.get("content-type") or "").split(";")[0]
@@ -832,14 +1197,37 @@ def aspirer(url: str, sortie: Path, pages_max: int = PAGES_MAX_DEFAUT) -> dict:
 
                 fichier = sortie / "assets-site" / f"{empreinte}{extension}"
                 fichier.write_bytes(contenu)
+                # Les sources qui ne sont pas une balise img (fond CSS, poster,
+                # icône déclarée) arrivent sans dimensions : on les mesure sur
+                # le fichier, sinon un favicon de 32 pixels passerait pour un
+                # logo faute de taille connue.
+                if not largeur or not hauteur:
+                    try:
+                        from PIL import Image as _Image
+                        with _Image.open(fichier) as _im:
+                            largeur, hauteur = _im.size
+                    except Exception:
+                        pass
                 par_source[src] = empreinte
                 index[empreinte] = {
                     "fichier": fichier.name, "source": src, "type": image.get("type"),
                     "zone": image.get("zone"), "alt": image.get("alt"),
                     "largeur": largeur, "hauteur": hauteur, "octets": len(contenu),
-                    "score_logo": _score_logo(image), "pages": [lecture["url"]],
+                    "affichee": image.get("affichee"),
+                    "lien_racine": bool(image.get("lien_racine")),
+                    "attributs": image.get("attributs", ""),
+                    "score_logo": 0, "pages": [lecture["url"]],
                 }
         navigateur.close()
+
+    # Le score logo se calcule APRÈS la fusion : la présence sur presque
+    # toutes les pages est un signal qui n'existe qu'une fois le tour fini.
+    # Une image photographique ne concourt pas : c'est un asset, jamais un logo.
+    for entree in index.values():
+        entree["photographique"] = _est_photographique(
+            sortie / "assets-site" / entree["fichier"])
+        entree["score_logo"] = (0 if entree["photographique"]
+                                else _score_logo(entree, nb_pages=len(lectures)))
 
     # Logos : SVG en ligne, puis images classées par score.
     logos: List[dict] = []

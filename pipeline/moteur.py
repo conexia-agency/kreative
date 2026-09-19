@@ -34,11 +34,12 @@ from typing import Dict, List, Optional
 import couts
 from etat import Commande, Crea
 
-# Le 1:1 est le format du skill de stratégie créative, et c'est aussi ce qui
-# reste cohérent avec le texte cuit décidé le 17/09 : une image dont le texte est
-# peint dedans ne se recadre pas, donc le master EST le livrable. L'ancien 9:16
-# n'avait de sens que pour la chaîne composée, où les trois formats se tiraient
-# d'un même master par recadrage sans nouvel appel au modèle.
+# Le format vient du skill de Kreative, qui l'impose noir sur blanc : « Le 1:1
+# (carré) est le format par défaut, toujours, tu ne changes de ratio que si le
+# brief l'exige explicitement », et sa propre liste de contrôle le vérifie.
+# La chaîne ne choisit donc pas le ratio du master, elle recopie le sien. Les
+# deux autres formats du 4.2 se tirent de ce carré après coup, dans
+# `formats.py`, sans que le master soit régénéré.
 FORMAT_MASTER = "1:1"
 RESOLUTION = "2k"
 
@@ -62,9 +63,9 @@ def _dossier_jobs(commande: Commande) -> Path:
 def a_generer(commande: Commande, filtre: Optional[List[str]] = None) -> List[Crea]:
     """Les créas briefées qui attendent un master.
 
-    Une créa sans `prompt.scene` est composée, pas générée : 91 créas sur 120
-    dans le corpus ne demandent aucun appel au modèle, et c'est le principal
-    poste d'économie de la chaîne.
+    Une créa sans `prompt.scene` n'est pas générable : le plan du skill ne l'a
+    pas couverte. Elle est laissée de côté plutôt que d'être envoyée au modèle
+    avec un prompt vide.
     """
     creas = [c for c in commande.creas() if c.etat == "briefee" and c.prompt.scene]
     if filtre:
@@ -76,12 +77,14 @@ def a_generer(commande: Commande, filtre: Optional[List[str]] = None) -> List[Cr
 def construire_prompt(crea: Crea) -> str:
     """Le prompt envoyé au modèle, sans un caractère de plus.
 
-    Rien n'est ajouté ici, et c'est délibéré. La consigne de cadrage est écrite
-    par `strategie.py` DANS le champ `prompt.scene` au moment de la
-    planification. Conséquence : ce que la commande `prompts` affiche est
-    exactement ce qui part au modèle, et un prompt corrigé à la main part tel
-    qu'il a été corrigé. Un prompt assemblé au dernier moment serait invisible
-    et non modifiable, ce qui est le défaut qu'on cherche à supprimer.
+    Rien n'est ajouté ici, et c'est le coeur du sujet. Le prompt entier a été
+    écrit par le skill de Kreative et rangé tel quel par `plan.py`. Y ajouter
+    une consigne au dernier moment reviendrait à corriger son travail sans que
+    personne le voie, et c'est exactement ce qui lui a été reproché le 18/09.
+
+    Conséquence utile : ce que la commande `prompts` affiche est exactement ce
+    qui part au modèle, et un prompt corrigé à la main part tel qu'il a été
+    corrigé.
     """
     return crea.prompt.rendu()
 
@@ -132,21 +135,17 @@ def preparer(commande: Commande, filtre: Optional[List[str]] = None,
         "solde_avant": None,
         "solde_apres": None,
         "jobs": jobs,
-        # Ce bloc est lu par la session qui génère. Il ne décore pas le fichier,
-        # il porte les règles que le lot ne doit pas laisser oublier.
-        # Ce bloc est lu par la session qui génère, et il fait foi. Il a été
-        # réécrit le 17/09 : il portait encore les règles de la chaîne composée
-        # (master 9:16, texte jamais gravé) alors que les prompts cuisent le
-        # texte en 1:1. Une session y aurait lu deux ordres contraires.
+        # Ce bloc est lu par la session qui génère. Il ne porte AUCUNE règle de
+        # création : celles-ci sont dans le skill de Kreative, qui a écrit les
+        # prompts, et les répéter ici les ferait diverger le jour où il change.
+        # Ce qui reste est mécanique, et n'existe qu'ici.
         "consignes": [
-            "Le texte EST peint par le modèle, c'est la décision du 17/09. Le "
-            "prompt porte la copy exacte à afficher, et le master 1:1 est le "
-            "livrable : il ne se recadre pas et ne se décline pas.",
-            "Le prompt part au modèle sans qu'un caractère soit ajouté. Ne rien "
-            "compléter, ne rien reformuler, ne rien traduire.",
-            "Un produit ou un logo qui porte une marque ne se génère jamais. Il "
-            "passe en référence i2i, avec la formule anti-régénération déjà "
-            "écrite dans le prompt.",
+            "Le prompt part au modèle sans qu'un caractère soit ajouté ni retiré. "
+            "Ne rien compléter, ne rien reformuler, ne rien traduire : il a été "
+            "écrit par le skill de Kreative et il fait foi.",
+            "Joindre en référence les fichiers listés dans `references`, dans "
+            "l'ordre où ils sont donnés : le prompt les appelle par leur rang.",
+            "Générer par le connecteur Higgsfield, jamais par la ligne de commande.",
             "Télécharger chaque image produite sur le disque avant de la ranger : "
             "les rendus Higgsfield disparaissent au bout de sept jours.",
             "Relever le solde avant et après le lot, et le passer à `recolter` : "

@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -44,32 +45,53 @@ from typing import Dict, List, Optional
 
 VERSION_SCHEMA = 1
 
-RACINE_DEFAUT = Path(__file__).resolve().parent.parent / "commandes"
+
+def _racine_travail() -> Path:
+    """Où vivent les commandes clientes. Trois cas, dans cet ordre.
+
+    1. `KREATIVE_TRAVAIL` est posée : c'est elle, toujours. C'est le mode
+       « skill installé » : le code vit dans un dossier skill immuable, les
+       données clientes vivent ailleurs, chez Kreative.
+    2. Pas de variable, mais un dossier `commandes/` existe à côté du code :
+       c'est le dépôt de développement Conexia, on ne change rien.
+    3. Ni l'un ni l'autre : `~/Kreative/commandes`, créé au premier usage.
+    """
+    var = os.environ.get("KREATIVE_TRAVAIL", "").strip()
+    if var:
+        return Path(var).expanduser() / "commandes"
+    locale = Path(__file__).resolve().parent.parent / "commandes"
+    if locale.is_dir():
+        return locale
+    return Path.home() / "Kreative" / "commandes"
+
+
+RACINE_DEFAUT = _racine_travail()
 
 # ---------------------------------------------------------------------------
-# Packs. Les volumes sont ceux du skill de stratégie créative, et ce sont les
-# volumes PRODUITS : 3 angles pour Starter, 6 pour Growth, 9 pour Scale, à deux
-# créas par angle. Deux créas par angle est un plancher et non un confort : en
-# dessous, on ne distingue plus « l'angle ne marche pas » de « cette exécution
-# ne marche pas ».
+# Packs. Les valeurs sont celles du CAHIER DES CHARGES de Kreative, article
+# 4.6 : 6, 12 et 24 créas vendues, et le double généré pour laisser une marge
+# de tri à la réception.
 #
-# Décision du 17/09 : **on ne surproduit plus.** Le 4.6 du cahier des charges
-# demandait le double du volume vendu, soit 12, 24 et 48. Ce qui est produit est
-# désormais ce qui est livré. Le facteur reste ici à 1 plutôt que d'être
-# supprimé : le jour où la surproduction revient, c'est une valeur à changer et
-# non une mécanique à réécrire.
+# **Ses deux documents ne disent pas la même chose, et c'est à lui de
+# trancher.** Son cahier des charges dit Scale = 24 vendues et 48 générées ;
+# son skill du 17/09 dit Scale = 18 créas pour 9 angles. On applique ici le
+# cahier des charges, parce que c'est lui qui décrit ce que le client a acheté,
+# et le skill décrit comment le produire. Si Evan répond l'inverse, c'est cette
+# table qui change, et elle seule.
 #
-# Conséquence à connaître : il n'y a plus de marge de tri à la réception. Chaque
-# créa doit être bonne, pas seulement la moitié.
+# Le facteur porte la surproduction. Il était passé à 1 le 17/09 sur une
+# décision interne qui n'était pas la sienne : sans marge, chaque créa doit
+# être bonne, alors que le 4.6 prévoit qu'on en produise deux pour en garder
+# une.
 # ---------------------------------------------------------------------------
 
 PACKS: Dict[str, int] = {
     "starter": 6,
     "growth": 12,
-    "scale": 18,
+    "scale": 24,
 }
 
-FACTEUR_SURPRODUCTION = 1
+FACTEUR_SURPRODUCTION = 2
 
 
 def volume_genere(quantite_vendue: int) -> int:

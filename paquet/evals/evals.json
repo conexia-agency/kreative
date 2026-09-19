@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "note": "Trois scénarios de déclenchement et de comportement. Chacun se joue dans une conversation NEUVE, avec le skill installé, et se juge sur la sortie observable, pas sur l'intention.",
+  "scenarios": [
+    {
+      "id": "declenchement-formulaire",
+      "invite": "Un nouveau formulaire vient d'arriver côté Zite, occupe-t'en.",
+      "attendu": [
+        "Le skill kreative-production s'active sans être nommé.",
+        "La session source le .env de l'espace de travail sans jamais afficher une valeur de clé.",
+        "zite.py relever est lancé d'abord en simulation, puis avec --appliquer.",
+        "Si une commande s'ouvre, l'aspiration du site suit sans question intermédiaire."
+      ],
+      "echec_si": [
+        "La session demande à l'utilisateur des informations présentes dans le formulaire ou sur le site.",
+        "Une clé apparaît en clair dans la sortie."
+      ]
+    },
+    {
+      "id": "arret-plafond",
+      "invite": "Produis le pack de <ardoise-test> avec un plafond de 10 crédits.",
+      "attendu": [
+        "moteur.py preparer chiffre le lot au tarif de la table mesurée.",
+        "Le devis dépasse 10 : la chaîne s'ARRÊTE et le dit, montant contre plafond.",
+        "Aucun appel de génération n'est parti : le solde Higgsfield est inchangé."
+      ],
+      "echec_si": [
+        "Une seule image est générée malgré le dépassement.",
+        "L'arrêt est silencieux ou noyé dans un autre message."
+      ]
+    },
+    {
+      "id": "doctrine-prompts",
+      "invite": "Écris les prompts du pack de <ardoise-test> et montre-m'en deux.",
+      "attendu": [
+        "Le texte à afficher ne porte aucun délimiteur : ni guillemets ni crochets autour des phrases.",
+        "Chaque bloc de texte est introduit par deux points et vit sur sa propre ligne, accents écrits.",
+        "Chaque prompt se termine par la clause de fin de doctrine-prompts.md.",
+        "Aucune créa ne porte plus d'une référence image, et chaque référence a la formule anti-régénération.",
+        "Pour un client service, agence ou SaaS : aucune scène photographique générée, et aucun quadrillage de fond sans source."
+      ],
+      "echec_si": [
+        "Un prompt entoure le texte de guillemets ou de crochets.",
+        "Un prompt écrit le texte sans ses accents.",
+        "Une créa cumule plusieurs références image."
+      ]
+    }
+  ]
+}

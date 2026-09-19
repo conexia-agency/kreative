@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 from typing import List
 
-import repertoire
 from etat import Commande, Crea
 
 
@@ -40,10 +39,9 @@ def _credits(creas: List[Crea]) -> str:
 
 
 def _bloc_crea(commande: Commande, crea: Crea) -> str:
-    ressort_cle, _, arch_cle = crea.angle.partition("/")
-    arch = repertoire.ARCHETYPES_PAR_CLE.get(arch_cle)
-    ressort = repertoire.RESSORTS_PAR_CLE.get(ressort_cle)
-
+    # L'angle est le libellé écrit par le skill de Kreative, affiché tel quel.
+    # Il passait avant par notre répertoire d'archétypes, qui a été sorti de la
+    # chaîne : la page montrait un vocabulaire qui n'était pas le sien.
     classe_visuel = "visuel"
     if crea.master and (commande.dossier / crea.master).exists():
         visuel = f'<img src="{html.escape(crea.master)}" loading="lazy" alt="{crea.identifiant}">'
@@ -79,7 +77,8 @@ def _bloc_crea(commande: Commande, crea: Crea) -> str:
             visuel = ('<div class="vide">aucun asset<br><span>scène générée de zéro, '
                       f'{chiffre}</span></div>')
     else:
-        visuel = '<div class="vide compose">composé en HTML<br><span>aucune génération</span></div>'
+        visuel = ('<div class="vide compose">pas de prompt<br>'
+                  '<span>le plan du skill n\'a rien écrit pour cette créa</span></div>')
         classe_visuel = "visuel plat"
 
     if crea.prompt.scene:
@@ -89,8 +88,8 @@ def _bloc_crea(commande: Commande, crea: Crea) -> str:
                    f'<code class="cmd">python3 kreative.py generer '
                    f'{html.escape(commande.donnees["ardoise"])} --crea {crea.identifiant}</code>')
     else:
-        corps_prompt = (f'<p class="sans">Archétype composé. Le visuel se fabrique en HTML à '
-                        f'partir des assets réels, aucun prompt n\'est envoyé à un modèle.</p>')
+        corps_prompt = ('<p class="sans">Aucun prompt pour cette créa : le plan produit par '
+                        'le skill ne la couvre pas.</p>')
         relance = ""
 
     alerte = ""
@@ -104,12 +103,11 @@ def _bloc_crea(commande: Commande, crea: Crea) -> str:
     <b>{crea.identifiant}</b>
     <span class="etat e-{html.escape(crea.etat)}">{html.escape(crea.etat)}</span>
     <span class="fab {'gen' if crea.prompt.scene else 'comp'}">
-      {'génération' if crea.prompt.scene else 'composé'}</span>
+      {'génération' if crea.prompt.scene else 'sans prompt'}</span>
     {f'<span class="tours">{crea.tours} reprise(s)</span>' if crea.tours else ''}
   </header>
   {alerte}
-  <div class="c"><span class="k">archétype</span><span class="v">{html.escape(arch.nom if arch else arch_cle)}</span></div>
-  <div class="c"><span class="k">ressort</span><span class="v">{html.escape(ressort.nom if ressort else ressort_cle)}</span></div>
+  <div class="c"><span class="k">angle</span><span class="v">{html.escape(crea.angle)}</span></div>
   <div class="c"><span class="k">accroche</span><span class="v">{html.escape(crea.copy.accroche)}</span></div>
   <div class="c"><span class="k">sous-accroche</span><span class="v">{html.escape(crea.copy.sous_accroche)}</span></div>
   <div class="c"><span class="k">prompt</span><span class="v">{corps_prompt}{relance}</span></div>

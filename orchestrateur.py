@@ -11,7 +11,14 @@ Un cycle enchaîne les maillons dans l'ordre, sur toutes les commandes concerné
 2. **site** : le site du client est aspiré, assets, captures et charte mesurée
    (`scraper.py`, point 4.1 du cahier des charges) ;
 3. **rédaction** : les réponses brutes deviennent un brief moteur (`redaction.py`) ;
-4. **stratégie** : le brief devient un plan de créas (`strategie.py`).
+4. **dossier** : l'inventaire de ce qui est sur le disque est écrit (`plan.py`).
+
+**Le cycle s'arrête là, et c'est le coeur du sujet.** La stratégie, les angles,
+la copy et les prompts sont produits par le SKILL de Kreative, dans une session.
+Un skill ne s'exécute pas dans un cron. L'orchestrateur prépare donc tout ce que
+le skill a besoin de trouver, et une session prend la suite. Ce qui existait
+avant à cette place, `strategie.py`, écrivait nos propres règles de création par
+dessus les siennes : il est sorti de la chaîne le 18/09.
 
 **Un site illisible n'arrête pas la commande.** On n'écrit alors aucune charte,
 parce qu'une charte tirée d'une page de garde est plausible et fausse. La chaîne
@@ -47,9 +54,9 @@ from typing import List
 RACINE = Path(__file__).resolve().parent
 sys.path.insert(0, str(RACINE / "pipeline"))
 
+import plan  # noqa: E402
 import redaction  # noqa: E402
 import scraper  # noqa: E402
-import strategie  # noqa: E402
 import zite  # noqa: E402
 from etat import RACINE_DEFAUT, Commande  # noqa: E402
 
@@ -179,7 +186,7 @@ def _site_a_traiter(commande: Commande) -> bool:
 
 def cycle(generer: bool = False, limite: int = 0, pages: int = 25) -> dict:
     bilan = {"ouvertes": 0, "aspirees": 0, "sites_refuses": 0, "redigees": 0,
-             "planifiees": 0, "echecs": 0, "en_attente_generation": 0}
+             "dossiers_prets": 0, "echecs": 0, "en_attente_skill": 0}
 
     try:
         releve = zite.relever(appliquer=True)
@@ -221,24 +228,34 @@ def cycle(generer: bool = False, limite: int = 0, pages: int = 25) -> dict:
                 bilan["echecs"] += 1
                 continue
 
+        # Le dossier d'entrées : l'inventaire de ce que le skill trouvera sur le
+        # disque. C'est le dernier maillon automatisable. Ce qui suit est la
+        # création, elle appartient au skill de Kreative et se fait en session.
         if commande.donnees.get("etat") == "recue" and commande.donnees["brief"].get("_redige"):
             try:
-                creas, diag = strategie.planifier(commande)
-                bilan["planifiees"] += 1
-                marquees = sum(1 for f in (commande.dossier / "creas").glob("*.json")
-                               if "[A COMPLETER" in f.read_text(encoding="utf-8"))
-                _journal("plan_etabli", commande=nom, creas=len(creas),
-                         creas_a_completer=marquees)
+                entrees = plan.dossier_entrees(commande)
+                plan.ecrire_dossier(commande)
+                bilan["dossiers_prets"] += 1
+                _journal("dossier_pret", commande=nom,
+                         pieces_jointes=len(entrees["pieces_jointes"]),
+                         captures=len(entrees["site"]["captures"]),
+                         charte=bool(entrees["site"]["charte"]),
+                         a_completer=len(entrees["brief"]["a_completer"]))
             except Exception as erreur:
-                _echouer(commande, "strategie", erreur)
+                _echouer(commande, "dossier", erreur)
                 bilan["echecs"] += 1
                 continue
 
-        if Commande.charger(nom).donnees.get("etat") == "strategie":
+        # Une commande dont le dossier est prêt et dont aucune créa ne porte de
+        # prompt attend le skill. On le dit à chaque cycle : c'est le seul point
+        # où la chaîne a besoin d'une session, et il ne doit pas être silencieux.
+        commande = Commande.charger(nom)
+        if commande.donnees["brief"].get("_redige") and \
+                not any(c.prompt.scene for c in commande.creas()):
+            bilan["en_attente_skill"] += 1
             if generer:
-                _journal("generation_non_branchee", commande=nom,
-                         note="le moteur natif Higgsfield n'est pas encore raccorde")
-            bilan["en_attente_generation"] += 1
+                _journal("attente_skill", commande=nom,
+                         note="la création vient du skill de Kreative, en session")
 
     _journal("cycle_termine", **bilan)
     return bilan
