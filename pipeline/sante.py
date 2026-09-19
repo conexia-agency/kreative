@@ -149,9 +149,31 @@ def controler() -> int:
     if sys.platform == "darwin":
         note(OK if vision.exists() else OPTION, "Apple Vision", "binaire compilé" if vision.exists() else "sera compilé au premier audit (macOS seulement)")
 
-    # 8. Ce qui ne se prouve qu'en session.
-    note(SESSION, "connecteur Higgsfield", "un appel « balance » en session fait foi ; hors session, rien ne peut le vérifier d'ici.")
-    note(SESSION, "navigateur", "exigé par le skill pour l'analyse du site ; en chaîne, scraper.py ou le navigateur de la session s'en charge.")
+    # 8. Le connecteur Higgsfield. La génération passe par lui et par rien
+    # d'autre. Sa CONFIGURATION se vérifie d'ici ; son APPEL, seulement en
+    # session. Sur Cowork, le connecteur se gère dans l'application, il n'y a
+    # rien à lire sur le disque.
+    if env == "paquet Cowork":
+        note(SESSION, "connecteur Higgsfield", "à activer dans les connecteurs de Cowork (voir INSTALLATION.md) ; l'appel de solde en session fait foi.")
+    else:
+        declare = False
+        try:
+            import json as _json
+            config = _json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8"))
+            serveurs = dict(config.get("mcpServers") or {})
+            for projet in (config.get("projects") or {}).values():
+                serveurs.update(projet.get("mcpServers") or {})
+            declare = "higgsfield" in serveurs
+        except Exception:
+            pass
+        if declare:
+            note(OK, "connecteur Higgsfield", "déclaré dans ~/.claude.json ; l'OAuth s'ouvre dans le navigateur au premier appel, un navigateur doit être disponible sur ce poste, une fois. L'appel de solde en session fait foi.")
+        else:
+            note(MANQUE, "connecteur Higgsfield", "non déclaré : la génération est impossible. L'ajouter (installation.md, section 2) : claude mcp add --transport http --scope user higgsfield https://mcp.higgsfield.ai/mcp, puis redémarrer Claude Code et laisser l'OAuth s'ouvrir dans le navigateur au premier appel. Jamais la CLI higgsfield : le MCP seul.")
+
+    # 9. Ce qui ne se prouve qu'en session.
+    note(SESSION, "génération", "un appel de solde (balance) en session prouve le connecteur autorisé et le compte crédité, avant toute dépense.")
+    note(SESSION, "navigateur", "exigé par le skill pour l'analyse du site ; en chaîne, scraper.py ou le navigateur de la session s'en charge. C'est aussi lui qui porte l'OAuth du connecteur au premier appel.")
 
     print(f"Environnement : {env}\n")
     for etat, quoi, detail in lignes:
