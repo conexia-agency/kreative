@@ -313,7 +313,11 @@ def lire_markdown(texte: str, base: Path) -> dict:
             "assets": _chemins_dans(crea["assets_texte"], base),
             "_assets_texte": crea["assets_texte"],
         })
-    return {"schema": SCHEMA, "creas": sorties, "ce_qui_a_manque": manque}
+    # Le texte entier est conservé : c'est lui qui porte la ligne « Références
+    # visuelles retenues » du skill, que le contrôle de la banque recoupe avec
+    # ce qui a réellement été ouvert.
+    return {"schema": SCHEMA, "creas": sorties, "ce_qui_a_manque": manque,
+            "_texte_brut": texte}
 
 
 def charger_plan(fichier: Path, commande: Commande) -> dict:
@@ -425,6 +429,27 @@ def importer(ardoise: str, fichier: Path) -> dict:
 
     recevables, refus, alertes = controler(plan, commande)
 
+    # La banque de références, avant tout le reste. Le skill demande d'ouvrir
+    # toutes les planches de la famille et les retenues en pleine résolution
+    # AVANT d'écrire les créas, et il fait cocher cette étape dans sa propre
+    # liste de contrôle. Cocher ne prouve rien : le 19/09, un run a cité seize
+    # références après avoir ouvert deux planches sur vingt et aucun fichier
+    # pleine résolution. Rien ne l'a arrêté. Désormais si.
+    #
+    # Ce contrôle ne juge aucun choix créatif. Il vérifie que les références
+    # citées ont réellement été demandées, que la famille est celle que le
+    # secteur désigne, et qu'aucune ancienne créa du client du jour n'est
+    # reprise. C'est son process, rendu mesurable.
+    import banque as module_banque
+
+    citees = module_banque.references_citees(plan.get("_texte_brut") or "")
+    manquements = module_banque.verifier(commande, citees or None)
+    # Un manquement de banque invalide le PLAN ENTIER, pas une créa : la
+    # sélection de références nourrit le pack globalement, le skill le dit
+    # lui-même. On ne range donc rien du tout, plutôt que de laisser passer
+    # dix-sept créas construites sans avoir regardé les références.
+    refus_plan = [f"banque de références : {m}" for m in manquements]
+
     # Un asset que le skill a nommé mais que la chaîne n'a pas trouvé sur le
     # disque. Ce n'est pas un refus : le skill peut nommer un asset en langage
     # naturel sans fichier. Mais sa règle de parité stricte veut que le prompt
@@ -437,6 +462,11 @@ def importer(ardoise: str, fichier: Path) -> dict:
         if manquants:
             alertes.append(f"{entree.get('id')} : asset nommé mais introuvable sur le "
                            f"disque, {', '.join(manquants)}")
+
+    if refus_plan:
+        commande.tracer("plan_refuse", motifs=len(refus_plan), creas=len(recevables))
+        return {"importees": [], "refus": refus_plan + refus, "alertes": alertes,
+                "ce_qui_a_manque": [], "plan_entier_refuse": True}
 
     for entree in recevables:
         crea = commande.lire_crea(entree["id"])

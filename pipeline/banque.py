@@ -1,0 +1,392 @@
+#!/usr/bin/env python3
+"""banque.py : rend verifiable la lecture de la banque de references.
+
+Le skill de Kreative decrit precisement comment se sert sa banque : ouvrir
+toutes les planches contact de la famille que le secteur designe, retenir les
+references pertinentes, **les ouvrir en pleine resolution**, puis seulement
+ecrire les creas. Et il termine sa sortie par une liste de controle ou la
+session coche elle-meme qu'elle l'a fait.
+
+**Le probleme est la : cocher ne prouve rien.** Le 19/09, un run a cite seize
+references dans son plan apres avoir ouvert deux planches sur vingt et aucun
+fichier pleine resolution. Rien ne l'a arrete, parce que rien ne regardait.
+L'ecart de finition s'est vu sur les visuels, pas sur le plan.
+
+Ce module ne change pas une ligne de son skill. Il rend seulement son propre
+process mesurable, en trois temps :
+
+1. `ouvrir` dit quelle famille s'applique, liste TOUTES les planches a ouvrir
+   avec leur chemin absolu, et pose l'attendu dans `session/banque.json` ;
+2. `retenir` enregistre les references retenues, refuse un identifiant qui
+   n'existe pas dans la banque, et donne le chemin pleine resolution de
+   chacune ;
+3. `verifier` compare, et c'est ce controle que `plan.py` appelle avant
+   d'accepter un plan.
+
+    python3 pipeline/banque.py ouvrir <ardoise>
+    python3 pipeline/banque.py lue <ardoise> --planches AG1_1 AG1_2
+    python3 pipeline/banque.py retenir <ardoise> --refs AG1-07 AG2-10 --du-client AG2-10
+    python3 pipeline/banque.py verifier <ardoise>
+
+Cible Python 3.9+. Aucune dependance externe.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+ICI = Path(__file__).resolve().parent
+sys.path.insert(0, str(ICI))
+
+from etat import Commande  # noqa: E402
+
+NOM_BANQUE = "CREAS INSPI DELIVERY"
+
+# Les trois familles, et les prefixes d'identifiant de chacune. Le skill les
+# nomme ainsi : AG1 a AG3 pour agence et SaaS, EC1 a EC5 pour l'e-commerce,
+# UG1 a UG6 pour les ugly ads.
+FAMILLES: Dict[str, Tuple[str, ...]] = {
+    "AGENCE - SAAS": ("AG1", "AG2", "AG3"),
+    "ECOMMERCE": ("EC1", "EC2", "EC3", "EC4", "EC5"),
+    "UGLY ADS": ("UG1", "UG2", "UG3", "UG4", "UG5", "UG6"),
+}
+
+# Routage par le secteur declare au formulaire, comme le skill le pose :
+# e-commerce et produit physique vers ECOMMERCE, tout le reste, agence, SaaS,
+# service, coaching, business local, vers AGENCE - SAAS.
+MOTS_ECOMMERCE = ("commerc", "ecommerc", "e-commerc", "boutique", "produit",
+                  "marque", "dtc", "shop")
+
+# Ce qui, dans le brief, ouvre la famille UGLY ADS. Le skill est formel :
+# jamais par defaut, uniquement si le client le demande explicitement.
+MOTS_UGLY = ("ugly ad", "uglyads", "ugly-ad", "meme", "mème", "format natif",
+             "formats natifs", "format decale", "formats decales",
+             "format décalé", "formats décalés")
+
+# Le plancher de references a retenir, cale sur le volume du pack, d'apres son
+# skill : autour de 10 pour 6 creas, 16 pour 12, 20 pour 24. On retient le
+# plancher, pas le nombre exact : c'est la pertinence qui tranche, et il le dit.
+PLANCHER_REFERENCES = {6: 10, 12: 16, 18: 18, 24: 20, 48: 20}
+
+
+def _racine_banque() -> Path:
+    """La banque, aux emplacements possibles selon l'installation."""
+    candidats = [
+        ICI.parent / "skill" / NOM_BANQUE,
+        ICI.parent / NOM_BANQUE,
+        ICI.parent.parent / NOM_BANQUE,
+        ICI.parent / "resources" / NOM_BANQUE,
+    ]
+    for chemin in candidats:
+        if chemin.is_dir():
+            return chemin
+    raise FileNotFoundError(
+        f"banque de references introuvable : le dossier « {NOM_BANQUE} » doit "
+        f"etre livre a cote du skill")
+
+
+def _sans_accent(valeur: str) -> str:
+    import unicodedata
+    plie = unicodedata.normalize("NFD", valeur or "")
+    return "".join(c for c in plie if unicodedata.category(c) != "Mn").lower()
+
+
+def familles_pour(commande: Commande) -> Tuple[str, List[str], Optional[str]]:
+    """La famille principale, les familles a ouvrir, et le motif de l'ugly.
+
+    Le secteur decide de la famille principale. Les ugly ads ne s'ajoutent que
+    si le client les demande, et on rend la phrase exacte qui les a declenchees
+    pour que la decision soit verifiable.
+    """
+    brief = commande.donnees.get("brief") or {}
+    reponses = brief.get("reponses") or {}
+    secteur = _sans_accent(str(reponses.get("secteur") or brief.get("verticale") or ""))
+
+    principale = "ECOMMERCE" if any(m in secteur for m in MOTS_ECOMMERCE) \
+        else "AGENCE - SAAS"
+
+    # La demande d'ugly ads se cherche partout ou le client ecrit librement.
+    champs = ("style_creas", "notes_libres", "part_ugly_ads", "ambiance",
+              "promo", "angles_a_eviter")
+    motif = None
+    for champ in champs:
+        texte = _sans_accent(str(reponses.get(champ) or ""))
+        for mot in MOTS_UGLY:
+            if _sans_accent(mot) in texte:
+                brut = str(reponses.get(champ) or "")
+                motif = f"{champ} : {' '.join(brut.split())[:160]}"
+                break
+        if motif:
+            break
+
+    familles = [principale] + (["UGLY ADS"] if motif else [])
+    return principale, familles, motif
+
+
+def planches_de(familles: List[str]) -> List[dict]:
+    """Toutes les planches contact des familles retenues, avec leur chemin."""
+    racine = _racine_banque() / "_PLANCHES"
+    prefixes = tuple(p for f in familles for p in FAMILLES.get(f, ()))
+    trouvees = []
+    for fichier in sorted(racine.glob("PLANCHE_*.jpg")):
+        cle = fichier.stem.replace("PLANCHE_", "")
+        if cle.split("_")[0] in prefixes:
+            trouvees.append({"planche": cle, "chemin": str(fichier)})
+    return trouvees
+
+
+def index_references() -> Dict[str, str]:
+    """Chaque identifiant de reference vers son fichier pleine resolution.
+
+    Les fichiers se nomment `HD_AG3-05.jpg` ou `HD_UG1-09_10.jpg`, un ou deux
+    identifiants par fichier. On indexe les deux.
+    """
+    racine = _racine_banque()
+    index: Dict[str, str] = {}
+    for fichier in racine.rglob("HD_*.jpg"):
+        corps = fichier.stem[3:]                       # apres « HD_ »
+        morceaux = corps.split("_")
+        base = morceaux[0]                             # « AG3-05 »
+        index[base] = str(fichier)
+        prefixe = base.rsplit("-", 1)[0]               # « AG3 »
+        for suite in morceaux[1:]:
+            if re.fullmatch(r"\d+", suite):
+                index[f"{prefixe}-{suite}"] = str(fichier)
+    return index
+
+
+def _fichier_etat(commande: Commande) -> Path:
+    chemin = commande.dossier / "session" / "banque.json"
+    chemin.parent.mkdir(parents=True, exist_ok=True)
+    return chemin
+
+
+def _lire_etat(commande: Commande) -> dict:
+    chemin = _fichier_etat(commande)
+    if not chemin.exists():
+        return {}
+    try:
+        return json.loads(chemin.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _ecrire_etat(commande: Commande, etat: dict) -> None:
+    _fichier_etat(commande).write_text(
+        json.dumps(etat, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# 1. Ouvrir : poser l'attendu
+# ---------------------------------------------------------------------------
+
+def ouvrir(commande: Commande) -> dict:
+    principale, familles, motif = familles_pour(commande)
+    planches = planches_de(familles)
+    attendues = commande.donnees.get("quantite_generee") or 0
+    plancher = PLANCHER_REFERENCES.get(attendues, 20)
+
+    etat = {
+        "famille_principale": principale,
+        "familles_ouvertes": familles,
+        "ugly_ads_motif": motif,
+        "planches_attendues": [p["planche"] for p in planches],
+        "planches_lues": [],
+        "references_retenues": [],
+        "references_du_client": [],
+        "plancher_references": plancher,
+    }
+    _ecrire_etat(commande, etat)
+    commande.tracer("banque_ouverte", famille=principale,
+                    planches=len(planches), ugly=bool(motif))
+    etat["_planches"] = planches
+    return etat
+
+
+def rapport_ouverture(etat: dict) -> str:
+    lignes = [
+        f"Famille : {etat['famille_principale']}"
+        + (f" + UGLY ADS" if "UGLY ADS" in etat["familles_ouvertes"] else ""),
+    ]
+    if etat.get("ugly_ads_motif"):
+        lignes.append(f"  ugly ads ouvertes parce que le brief le demande, {etat['ugly_ads_motif']}")
+    else:
+        lignes.append("  ugly ads NON ouvertes : le brief ne les demande pas")
+    lignes += ["",
+               f"{len(etat['planches_attendues'])} planche(s) a ouvrir, toutes, "
+               f"avant d'ecrire la moindre crea :"]
+    for p in etat.get("_planches", []):
+        lignes.append(f"  {p['planche']:<8} {p['chemin']}")
+    lignes += ["",
+               f"Plancher de references a retenir : {etat['plancher_references']}.",
+               "Les ouvrir ensuite en pleine resolution :",
+               "  python3 pipeline/banque.py retenir <ardoise> --refs AG1-07 AG2-03 ..."]
+    return "\n".join(lignes)
+
+
+# ---------------------------------------------------------------------------
+# 2. Consigner ce qui a ete lu et retenu
+# ---------------------------------------------------------------------------
+
+def marquer_lues(commande: Commande, planches: List[str]) -> dict:
+    etat = _lire_etat(commande)
+    if not etat:
+        raise RuntimeError("lancer d'abord : banque.py ouvrir")
+    connues = set(etat["planches_attendues"])
+    inconnues = [p for p in planches if p not in connues]
+    if inconnues:
+        raise ValueError(f"planche(s) hors de la famille retenue : {', '.join(inconnues)}. "
+                         f"Attendues : {', '.join(sorted(connues))}")
+    etat["planches_lues"] = sorted(set(etat.get("planches_lues", [])) | set(planches))
+    _ecrire_etat(commande, etat)
+    commande.tracer("banque_planches_lues", lues=len(etat["planches_lues"]),
+                    attendues=len(connues))
+    return etat
+
+
+def retenir(commande: Commande, refs: List[str],
+            du_client: Optional[List[str]] = None) -> dict:
+    etat = _lire_etat(commande)
+    if not etat:
+        raise RuntimeError("lancer d'abord : banque.py ouvrir")
+
+    index = index_references()
+    prefixes = tuple(p for f in etat["familles_ouvertes"] for p in FAMILLES.get(f, ()))
+
+    inconnues = [r for r in refs if r not in index]
+    if inconnues:
+        raise ValueError(f"reference(s) inexistante(s) dans la banque : "
+                         f"{', '.join(inconnues)}. Une reference qu'on n'a pas "
+                         f"ouverte ne se cite pas.")
+    hors_famille = [r for r in refs if not r.startswith(prefixes)]
+    if hors_famille:
+        raise ValueError(f"reference(s) hors de la famille retenue : "
+                         f"{', '.join(hors_famille)}. Familles ouvertes : "
+                         f"{', '.join(etat['familles_ouvertes'])}")
+
+    etat["references_retenues"] = sorted(set(refs))
+    etat["references_du_client"] = sorted(set(du_client or []))
+    etat["chemins_pleine_resolution"] = {r: index[r] for r in sorted(set(refs))}
+    _ecrire_etat(commande, etat)
+    commande.tracer("banque_references_retenues", retenues=len(refs),
+                    du_client=len(etat["references_du_client"]))
+    return etat
+
+
+# ---------------------------------------------------------------------------
+# 3. Verifier : le gate que plan.py appelle
+# ---------------------------------------------------------------------------
+
+def verifier(commande: Commande, refs_du_plan: Optional[List[str]] = None) -> List[str]:
+    """Les manquements, en clair. Liste vide si le process a ete suivi."""
+    etat = _lire_etat(commande)
+    if not etat:
+        return ["la banque de references n'a jamais ete ouverte pour cette commande : "
+                "lancer banque.py ouvrir, puis lire les planches"]
+
+    fautes: List[str] = []
+
+    attendues = set(etat.get("planches_attendues") or [])
+    lues = set(etat.get("planches_lues") or [])
+    manquantes = sorted(attendues - lues)
+    if manquantes:
+        fautes.append(f"{len(manquantes)} planche(s) de la famille non ouverte(s) : "
+                      f"{', '.join(manquantes)}. Le skill demande de les ouvrir toutes.")
+
+    retenues = set(etat.get("references_retenues") or [])
+    plancher = etat.get("plancher_references") or 10
+    if not retenues:
+        fautes.append("aucune reference retenue, et aucune ouverte en pleine resolution")
+    elif len(retenues) < plancher:
+        fautes.append(f"{len(retenues)} reference(s) retenue(s) pour un plancher de "
+                      f"{plancher} sur ce volume de pack")
+
+    du_client = set(etat.get("references_du_client") or [])
+    reprises = sorted(retenues & du_client)
+    if reprises:
+        fautes.append(f"reference(s) retenue(s) alors qu'elles portent la marque du "
+                      f"client : {', '.join(reprises)}. Le skill l'interdit, un client "
+                      f"qui revient veut du neuf.")
+
+    if refs_du_plan is not None:
+        citees = set(refs_du_plan)
+        non_ouvertes = sorted(citees - retenues)
+        if non_ouvertes:
+            fautes.append(f"le plan cite {len(non_ouvertes)} reference(s) qui n'ont pas "
+                          f"ete ouvertes en pleine resolution : {', '.join(non_ouvertes)}")
+    return fautes
+
+
+def references_citees(texte: str) -> List[str]:
+    """Les identifiants de reference cites dans la sortie du skill."""
+    return sorted(set(re.findall(r"\b(?:AG[1-3]|EC[1-5]|UG[1-6])-\d{2}\b", texte or "")))
+
+
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    analyseur = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    sous = analyseur.add_subparsers(dest="action", required=True)
+
+    p = sous.add_parser("ouvrir", help="poser la famille et les planches a ouvrir")
+    p.add_argument("ardoise")
+
+    p = sous.add_parser("lue", help="consigner les planches ouvertes")
+    p.add_argument("ardoise")
+    p.add_argument("--planches", nargs="+", required=True)
+
+    p = sous.add_parser("retenir", help="consigner les references retenues")
+    p.add_argument("ardoise")
+    p.add_argument("--refs", nargs="+", required=True)
+    p.add_argument("--du-client", nargs="*", dest="du_client",
+                   help="celles qui portent la marque du client du jour")
+
+    p = sous.add_parser("verifier", help="controler que le process a ete suivi")
+    p.add_argument("ardoise")
+
+    args = analyseur.parse_args()
+
+    try:
+        commande = Commande.charger(args.ardoise)
+
+        if args.action == "ouvrir":
+            print(rapport_ouverture(ouvrir(commande)))
+            return 0
+
+        if args.action == "lue":
+            etat = marquer_lues(commande, args.planches)
+            reste = sorted(set(etat["planches_attendues"]) - set(etat["planches_lues"]))
+            print(f"{len(etat['planches_lues'])}/{len(etat['planches_attendues'])} planche(s) lue(s).")
+            if reste:
+                print(f"  reste a ouvrir : {', '.join(reste)}")
+            return 0
+
+        if args.action == "retenir":
+            etat = retenir(commande, args.refs, args.du_client)
+            print(f"{len(etat['references_retenues'])} reference(s) retenue(s), "
+                  f"plancher {etat['plancher_references']}.")
+            for ref, chemin in etat["chemins_pleine_resolution"].items():
+                marque = "  [marque du client]" if ref in etat["references_du_client"] else ""
+                print(f"  {ref:<8} {chemin}{marque}")
+            return 0
+
+        fautes = verifier(commande)
+        if not fautes:
+            print("Banque : process suivi.")
+            return 0
+        print(f"{len(fautes)} manquement(s) :")
+        for f in fautes:
+            print(f"  {f}")
+        return 1
+
+    except (FileNotFoundError, RuntimeError, ValueError) as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

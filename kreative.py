@@ -91,6 +91,14 @@ def commande_plan(marque: str, fichier: Path) -> int:
         print(f"Erreur : {erreur}", file=sys.stderr)
         return 1
 
+    if bilan.get("plan_entier_refuse"):
+        print(c("PLAN REFUSÉ EN ENTIER, rien n'a été rangé.", ROUGE))
+        for refus in bilan["refus"]:
+            print(f"  {refus}")
+        print("\nLe process du skill n'a pas été suivi jusqu'au bout. Reprendre à :")
+        print(f"  python3 pipeline/banque.py ouvrir {marque}")
+        return 1
+
     print(f"{len(bilan['importees'])} créa(s) rangée(s)"
           + (f" : {', '.join(bilan['importees'])}" if bilan["importees"] else "."))
     for refus in bilan["refus"]:
