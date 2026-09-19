@@ -63,8 +63,10 @@ Sans ce registre, le plan sera refusé à l'étape 5.
 
 ## 4. Stratégie, copy et prompts
 
-Lis `resources/strategie-creative.md` et applique-le jusqu'aux prompts
-finalisés, dans son format de sortie. Écris ta sortie dans un fichier.
+Lis `resources/strategie-creative.md` EN ENTIER, en une seule lecture, du
+début à la fin, avant d'écrire la moindre ligne de stratégie. Puis
+applique-le jusqu'aux prompts finalisés, dans son format de sortie. Écris ta
+sortie dans un fichier. On n'écrit JAMAIS `creas/` à la main.
 
 ## 5. Ranger le plan
 
@@ -79,6 +81,8 @@ Par le connecteur Higgsfield, avec les paramètres que le lot indique :
 
     python3 scripts/pipeline/moteur.py preparer <ardoise>
 
+`preparer` REFUSE un plan qui n'est pas passé par `plan.py importer` ou une
+banque sans registre : c'est le verrou, pas une erreur à contourner.
 Annonce le coût avant de générer, relève le solde avant et après, puis :
 
     python3 scripts/pipeline/moteur.py recolter <ardoise> --resultats <fichier>

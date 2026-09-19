@@ -66,12 +66,25 @@ def _garde(chemin: Path) -> bool:
     return True
 
 
+def _doublon_icloud(chemin: Path) -> bool:
+    """« fichier 2.py », « dossier 2 » : les copies de conflit iCloud.
+
+    Elles apparaissent toutes seules sur ce poste et sont toujours périmées :
+    en embarquer une dans un paquet, c'est risquer qu'une session lise un
+    vieux SKILL. On les écarte à la copie, quel que soit leur emplacement.
+    """
+    import re
+    return any(re.search(r" \d+$", Path(part).stem) for part in chemin.parts)
+
+
 def _copier_arbre(source: Path, cible: Path) -> int:
     n = 0
     for element in sorted(source.rglob("*")):
         if not element.is_file():
             continue
         if any(part in EXCLUS_NOMS for part in element.parts):
+            continue
+        if _doublon_icloud(element.relative_to(source)):
             continue
         if not _garde(element):
             continue

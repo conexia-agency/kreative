@@ -27,6 +27,7 @@ Cible Python 3.9+. Aucune dépendance externe.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -37,7 +38,7 @@ from typing import Dict, List, Optional, Tuple
 RACINE = Path(__file__).resolve().parent
 sys.path.insert(0, str(RACINE))
 
-from etat import Commande, Crea  # noqa: E402
+from etat import Commande, Crea, maintenant  # noqa: E402
 
 SCHEMA = "kreative-plan/1"
 
@@ -592,6 +593,25 @@ def importer(ardoise: str, fichier: Path) -> dict:
     (commande.dossier / "session").mkdir(parents=True, exist_ok=True)
     (commande.dossier / "session" / "plan-recu.json").write_text(
         json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Le marqueur que moteur.py preparer exige avant de constituer un lot.
+    # Il n'existe que si les créas sont passées par cet import, donc par les
+    # gates (banque comprise) : une créa écrite à la main dans creas/ n'y
+    # figure pas et ne partira jamais en génération. Les imports successifs
+    # s'accumulent, un pack se construit souvent en plusieurs plans.
+    chemin_valide = commande.dossier / "session" / "plan-valide.json"
+    couvertes: List[str] = []
+    if chemin_valide.exists():
+        try:
+            couvertes = list(json.loads(chemin_valide.read_text(encoding="utf-8")).get("creas") or [])
+        except Exception:
+            couvertes = []
+    couvertes = sorted(set(couvertes) | {c["id"] for c in recevables})
+    chemin_valide.write_text(json.dumps({
+        "creas": couvertes,
+        "plan": hashlib.sha256(fichier.read_bytes()).hexdigest(),
+        "date": maintenant(),
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
 
     commande.tracer("plan_importe", creas=len(recevables), refus=len(refus),
                     alertes=len(alertes), carences=len(manque))

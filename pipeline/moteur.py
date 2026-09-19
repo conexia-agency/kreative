@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -99,6 +100,44 @@ def preparer(commande: Commande, filtre: Optional[List[str]] = None,
     creas = a_generer(commande, filtre)
     if not creas:
         return None
+
+    # Le verrou d'entrée. Une créa n'est générable que si elle est passée par
+    # plan.py importer : c'est lui qui fait tourner les gates, banque de
+    # références comprise. Le 19/09, une session a suivi le skill « de tête »,
+    # a écrit ses créas sans ouvrir une seule planche, et rien ne l'a arrêtée
+    # avant la génération. Désormais si : la vigilance ne se prescrit pas,
+    # elle se verrouille.
+    chemin_valide = commande.dossier / "session" / "plan-valide.json"
+    couvertes: set = set()
+    if chemin_valide.exists():
+        try:
+            couvertes = set(json.loads(chemin_valide.read_text(encoding="utf-8")).get("creas") or [])
+        except Exception:
+            couvertes = set()
+    hors_plan = sorted(c.identifiant for c in creas if c.identifiant not in couvertes)
+    if hors_plan:
+        raise RuntimeError(
+            "GÉNÉRATION REFUSÉE : "
+            + (f"{len(hors_plan)} créa(s) n'ont pas été rangées par plan.py importer "
+               f"({', '.join(hors_plan)})" if couvertes else
+               "aucun plan n'a été importé pour cette commande")
+            + ". Les créas ne s'écrivent jamais à la main dans creas/ : la sortie du "
+              "skill créatif est un plan markdown, rangé par « python3 "
+              "scripts/pipeline/plan.py importer <ardoise> --fichier <plan.md> ». "
+              "C'est cet import qui fait tourner les gates (banque de références "
+              "ouverte et retenue, copy dans le prompt, zéro tiret cadratin). "
+              "Importer le plan, puis relancer preparer.")
+
+    # Et la banque elle-même, rejouée ici : si session/ a été purgé ou le
+    # registre trafiqué entre l'import et la génération, on le voit maintenant,
+    # pas sur les visuels livrés.
+    import banque as module_banque
+    manquements = module_banque.verifier(commande)
+    if manquements:
+        raise RuntimeError(
+            "GÉNÉRATION REFUSÉE, banque de références : "
+            + " · ".join(manquements)
+            + ". Reprendre banque.py ouvrir / lue / retenir, puis relancer preparer.")
 
     jobs = []
     for crea in creas:
@@ -297,7 +336,11 @@ def main() -> int:
     commande = Commande.charger(args.ardoise)
 
     if args.action == "preparer":
-        lot = preparer(commande, args.creas, args.plafond)
+        try:
+            lot = preparer(commande, args.creas, args.plafond)
+        except RuntimeError as refus:
+            print(f"moteur : {refus}", file=sys.stderr)
+            return 1
         if not lot:
             print("Aucune créa briefée en attente de génération.")
             return 0
