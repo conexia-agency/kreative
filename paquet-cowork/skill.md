@@ -91,7 +91,13 @@ Annonce le coût avant de générer, relève le solde avant et après, puis :
 
 Les formats que le prolongement de bord refuse se produisent par le connecteur
 puis se rangent avec `formats.py ranger-extension`. L'audit ne bloque pas :
-regarde ses alertes à l'oeil, c'est toi qui tranches. La livraison crée le
+regarde ses alertes à l'oeil, c'est toi qui tranches. Pour cette relecture :
+
+    python3 scripts/pipeline/loupe.py <ardoise>
+
+découpe chaque master en quatre zones qui se recouvrent, dans
+`session/loupe/`. Ouvre chaque zone une par une : un texte peint ne se
+juge jamais sur la vignette entière, toutes les fautes se voient au zoom. La livraison crée le
 dossier au nom de la marque et envoie la notification.
 
 Pour la plateforme de revue, en option :

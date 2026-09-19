@@ -43,6 +43,7 @@ from empaqueter import _controler, _copier_arbre  # noqa: E402
 # Les modules qui tournent dans Cowork : Python pur, aucune dépendance système.
 MODULES_PORTABLES = (
     "sante.py",         # le contrôle de branchement, à jouer en premier
+    "loupe.py",         # les quadrants pleine résolution pour la relecture
     "etat.py",          # le modèle de commande, socle de tous les autres
     "zite.py",          # relevé des formulaires, urllib seul
     "banque.py",        # le registre de lecture de la banque de références

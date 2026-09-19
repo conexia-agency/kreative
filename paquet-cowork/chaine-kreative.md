@@ -92,6 +92,13 @@ produisent par le connecteur (extension à 2 crédits), puis se rangent avec
 
 qui repose le master d'origine au centre, à l'octet près.
 
+La relecture des textes peints se fait sur les découpes de
+
+    python3 scripts/pipeline/loupe.py <ardoise>
+
+une zone par image, toute la résolution pour chacune. La créa entière sert
+à juger la composition ; les zones servent à lire les lettres.
+
 ## 5. Ce qui change dans Cowork
 
 Cowork exécute du Python mais ne peut pas installer de logiciel pendant qu'il
