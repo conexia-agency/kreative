@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 import unicodedata
@@ -90,6 +91,41 @@ def _tesseract_disponible() -> bool:
         return False
 
 
+def _vision_disponible() -> Optional[str]:
+    """Le chemin de l'OCR Apple Vision, compilé au premier usage, sinon None.
+
+    Vision n'existe que sur macOS, et c'est un BONUS, jamais un prérequis : le
+    paquet doit tourner chez un client sans Mac, où tesseract et la relecture
+    en session font le travail. Mais là où Vision existe, il change tout,
+    mesuré le 19/09 sur trois créas : la bulle noire sur violet que tesseract
+    rendait vide, le manuscrit qu'il rendait en charabia (« caloul », « cnea »)
+    et la liste de noms où il inventait « SEAT », Vision les lit intégralement
+    et sans faute. Trois dérogations sur quatre venaient de tesseract, pas des
+    images.
+    """
+    if sys.platform != "darwin":
+        return None
+    binaire = Path.home() / ".cache" / "kreative" / "ocr-vision"
+    if binaire.exists():
+        return str(binaire)
+    source = None
+    for candidat in (ICI.parent / "outils" / "ocr-vision.swift",
+                     ICI / "ocr-vision.swift"):
+        if candidat.exists():
+            source = candidat
+            break
+    if source is None or not shutil.which("swiftc"):
+        return None
+    binaire.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        resultat = subprocess.run(
+            ["swiftc", "-O", str(source), "-o", str(binaire)],
+            capture_output=True, timeout=300)
+        return str(binaire) if resultat.returncode == 0 and binaire.exists() else None
+    except Exception:
+        return None
+
+
 def _normaliser(texte: str) -> List[str]:
     """Les mots d'au moins quatre lettres, sans accent ni casse.
 
@@ -129,7 +165,8 @@ def c1_copy_peinte(commande: Commande, crea: Crea) -> Optional[Constat]:
     if not crea.master:
         return None
     chemin = commande.dossier / crea.master
-    if not chemin.exists() or not _tesseract_disponible():
+    vision = _vision_disponible()
+    if not chemin.exists() or (vision is None and not _tesseract_disponible()):
         return None
 
     # Deux modes de segmentation, et on garde l'union. Le mode 11, texte
@@ -143,15 +180,31 @@ def c1_copy_peinte(commande: Commande, crea: Crea) -> Optional[Constat]:
     # vient de lire. Quatre masters Podmax ont ainsi été déclarés sans texte le
     # 19/09, alors que l'OCR les lisait parfaitement par leur chemin réel.
     reel = str(chemin.resolve())
-    lus: set = set()
-    for segmentation in ("3", "11"):
+    # Les deux moteurs ne servent pas la même question. Le RAPPEL se mesure
+    # sur l'union des lectures : un mot est absent seulement si personne ne
+    # l'a lu. Les INTRUS se mesurent sur la lecture du meilleur moteur
+    # disponible : tesseract fabrique ses propres mots sur du manuscrit ou du
+    # texte incliné (« caloul », « SEAT », mesuré le 19/09), et les verser
+    # dans les intrus accusait des créas propres.
+    lus_vision: set = set()
+    lus_tesseract: set = set()
+    if vision:
         try:
-            brut = subprocess.run(
-                ["tesseract", reel, "-", "-l", "fra+eng", "--psm", segmentation],
-                capture_output=True, timeout=90)
-            lus |= set(_normaliser(brut.stdout.decode("utf-8", "replace")))
+            brut = subprocess.run([vision, reel], capture_output=True, timeout=90)
+            lus_vision = set(_normaliser(brut.stdout.decode("utf-8", "replace")))
         except Exception:
-            continue
+            pass
+    if _tesseract_disponible():
+        for segmentation in ("3", "11"):
+            try:
+                brut = subprocess.run(
+                    ["tesseract", reel, "-", "-l", "fra+eng", "--psm", segmentation],
+                    capture_output=True, timeout=90)
+                lus_tesseract |= set(_normaliser(brut.stdout.decode("utf-8", "replace")))
+            except Exception:
+                continue
+    lus = lus_vision | lus_tesseract
+    fiables = lus_vision if lus_vision else lus
     attendus = set()
     for champ in (crea.copy.accroche, crea.copy.sous_accroche,
                   crea.copy.cta, crea.copy.badge):
@@ -163,7 +216,31 @@ def c1_copy_peinte(commande: Commande, crea: Crea) -> Optional[Constat]:
 
     trouves = attendus & lus
     rappel = len(trouves) / len(attendus)
-    intrus = sorted(lus - attendus)
+
+    # Les intrus se mesurent contre le PROMPT ENTIER, pas contre la seule
+    # copy. Le prompt décrit aussi les habillages que le modèle peint à bon
+    # droit : le nom de la marque, les libellés d'un schéma, les étiquettes
+    # d'une courbe. Mesuré le 19/09 : comparer à la copy seule produisait
+    # dix-huit alertes dont « podmax », « studio » et « fréquence », et le
+    # vrai faux texte se noyait dedans. Un mot lu qui n'est NI dans la copy
+    # NI dans le prompt reste un intrus : un mot dégradé comme « caloul » ou
+    # « qontc » n'est écrit nulle part, il ressort toujours.
+    autorises = attendus | set(_normaliser(crea.prompt.scene))
+    # Le nom de la marque est toujours légitime dans sa propre publicité,
+    # même quand le prompt pose le logo par référence sans écrire le mot.
+    autorises |= set(_normaliser(str(commande.donnees.get("marque") or "")))
+    autorises |= set(_normaliser(str(commande.donnees.get("ardoise") or "")))
+
+    bruts = fiables - autorises
+    # L'OCR fragmente les textes inclinés : « annonceurs » ressort en « anno »
+    # et « nceurs », « Voir nos » en « voirnos ». Un éclat n'est pas un intrus :
+    # tout mot lu qui est contenu dans un mot autorisé, ou qui contient un mot
+    # autorisé, est un débris de lecture, pas un texte inventé. « caloul » ou
+    # « qontc » ne sont ni l'un ni l'autre : ils restent détectés.
+    def _eclat(mot: str) -> bool:
+        return any(mot in a or a in mot for a in autorises)
+
+    intrus = sorted(m for m in bruts if not _eclat(m))
 
     if not lus:
         return Constat(

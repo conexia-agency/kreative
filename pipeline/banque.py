@@ -337,9 +337,30 @@ def verifier(commande: Commande, refs_du_plan: Optional[List[str]] = None) -> Li
     return fautes
 
 
+MOTIF_REFERENCE = re.compile(r"\b(?:AG[1-3]|EC[1-5]|UG[1-6])-\d{2}\b")
+
+# La ligne du format de sortie du skill qui porte la selection, et elle seule.
+MOTIF_LIGNE_RETENUES = re.compile(
+    r"^[-*\s]*\**\s*R[ée]f[ée]rences?\s+visuelles?\s+retenues?\s*\**\s*:(.*)$",
+    re.I | re.M)
+
+
 def references_citees(texte: str) -> List[str]:
-    """Les identifiants de reference cites dans la sortie du skill."""
-    return sorted(set(re.findall(r"\b(?:AG[1-3]|EC[1-5]|UG[1-6])-\d{2}\b", texte or "")))
+    """Les references que le plan declare RETENIR, et rien d'autre.
+
+    La nuance est necessaire. Un plan honnete NOMME aussi les references qu'il
+    ecarte, par exemple les anciennes creas du client, et il a raison de le
+    faire : c'est la trace de la decision. Chercher les identifiants dans tout
+    le texte confondait les deux, et refusait un plan justement parce qu'il
+    expliquait ce qu'il avait ecarte. Constate le 19/09 sur le plan Podmax v2.
+
+    On lit donc la seule ligne que le format de sortie du skill prevoit pour la
+    selection, « References visuelles retenues ». A defaut de cette ligne, on
+    retombe sur le texte entier : mieux vaut un controle trop large qu'aucun.
+    """
+    ligne = MOTIF_LIGNE_RETENUES.search(texte or "")
+    portee = ligne.group(1) if ligne else (texte or "")
+    return sorted(set(MOTIF_REFERENCE.findall(portee)))
 
 
 # ---------------------------------------------------------------------------

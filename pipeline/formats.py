@@ -133,6 +133,86 @@ def etendre(master: Path, ratio_cible: float) -> Tuple[object, dict]:
         return toile, mesure
 
 
+def assembler_extension(master: Path, sortie_connecteur: Path, cible: Path,
+                        ratio_cible: float, fondu: int = 24) -> dict:
+    """Monte le format final : bandes du connecteur, master intact au centre.
+
+    L'extension par le connecteur invente des bandes crédibles, mais elle
+    rééchantillonne TOUT le canevas au passage : mesuré le 19/09, un carré
+    central qui s'écartait du master de 11,28 en moyenne par pixel, quand la
+    règle 4.2 exige le même visuel décliné. On ne garde donc du connecteur que
+    ce qu'il a inventé, les bandes, et on repose le master d'origine au centre,
+    à l'octet près. Seule la couture est fondue, sur quelques pixels, pour que
+    le raccord ne fasse pas une ligne.
+    """
+    from PIL import Image
+
+    with Image.open(master) as im:
+        original = im.convert("RGB")
+    largeur, hauteur = original.size
+    cible_hauteur = int(round(largeur * ratio_cible))
+
+    with Image.open(sortie_connecteur) as im:
+        etendue = im.convert("RGB")
+    if etendue.size != (largeur, cible_hauteur):
+        etendue = etendue.resize((largeur, cible_hauteur), Image.LANCZOS)
+
+    ajout_haut = (cible_hauteur - hauteur) // 2
+    toile = etendue.copy()
+    toile.paste(original, (0, ajout_haut))
+
+    # Le fondu de couture : sur les premières et dernières lignes du master,
+    # on mélange linéairement vers la version du connecteur, pour absorber un
+    # éventuel écart de teinte au raccord.
+    if fondu > 0:
+        for rang in range(fondu):
+            alpha = (rang + 1) / (fondu + 1)
+            for y_master, y_toile in ((rang, ajout_haut + rang),
+                                      (hauteur - 1 - rang,
+                                       ajout_haut + hauteur - 1 - rang)):
+                ligne_master = original.crop((0, y_master, largeur, y_master + 1))
+                ligne_conn = etendue.crop((0, y_toile, largeur, y_toile + 1))
+                toile.paste(Image.blend(ligne_master, ligne_conn, 1 - alpha),
+                            (0, y_toile))
+
+    cible.parent.mkdir(parents=True, exist_ok=True)
+    toile.save(cible, "PNG")
+    return {"largeur": largeur, "hauteur": cible_hauteur,
+            "bande_haut": ajout_haut,
+            "bande_bas": cible_hauteur - hauteur - ajout_haut,
+            "methode": "bandes du connecteur, master reposé au centre",
+            "fondu_px": fondu}
+
+
+def ranger_extension(commande: Commande, identifiant: str, nom_format: str,
+                     fichier: Path) -> dict:
+    """Assemble et range un format produit par le connecteur."""
+    crea = commande.lire_crea(identifiant)
+    if not crea.master:
+        raise RuntimeError(f"{identifiant} n'a pas de master")
+    master = commande.dossier / crea.master
+    ratio = FORMATS[nom_format]
+    cible = commande.dossier / "dist" / identifiant / f"{identifiant}-{nom_format}.png"
+    mesure = assembler_extension(master, fichier, cible, ratio)
+    mesure["empreinte_master"] = _empreinte(master)
+
+    crea = commande.lire_crea(identifiant)
+    crea.rendus = dict(crea.rendus or {})
+    crea.rendus[nom_format] = str(cible.relative_to(commande.dossier))
+    bloc = dict((crea.audit or {}).get("formats") or {})
+    bloc["produits"] = sorted(set(bloc.get("produits") or []) | {nom_format})
+    bloc["a_etendre"] = [n for n in (bloc.get("a_etendre") or []) if n != nom_format]
+    bloc["empreinte_master"] = mesure["empreinte_master"]
+    crea.audit = dict(crea.audit or {})
+    crea.audit["formats"] = bloc
+    if all(n in crea.rendus for n in FORMATS):
+        crea.etat = "composee"
+    commande.ecrire_crea(crea)
+    commande.tracer("format_etendu", crea=identifiant, format=nom_format,
+                    methode=mesure["methode"])
+    return mesure
+
+
 def decliner_crea(commande: Commande, crea: Crea) -> dict:
     """Produit les trois fichiers d'une créa. Rend le bilan de l'opération."""
     from PIL import Image
@@ -160,6 +240,14 @@ def decliner_crea(commande: Commande, crea: Crea) -> dict:
 
     for nom, ratio in FORMATS.items():
         if nom == FORMAT_MASTER:
+            continue
+        # Un format déjà assemblé depuis le connecteur ne se refait pas : le
+        # refus du prolongement de bord écraserait un fichier payé et valide.
+        deja = dossier / f"{crea.identifiant}-{nom}.png"
+        if deja.exists():
+            rendus[nom] = str(deja.relative_to(commande.dossier))
+            mesures[nom] = {"methode": "déjà produit, conservé",
+                            "empreinte_master": empreinte}
             continue
         image, mesure = etendre(master, ratio)
         mesure["empreinte_master"] = empreinte
@@ -229,12 +317,41 @@ def decliner(commande: Commande, filtre: Optional[List[str]] = None) -> dict:
             "a_etendre": reste, "bilans": bilans}
 
 
+# Au-delà, le carré central d'une déclinaison n'est plus « le même visuel »
+# que le master. La différence est une moyenne par pixel sur 0..255, mesurée
+# en niveaux de gris à taille réduite. Un prolongement de bord fait 0.0 par
+# construction. Une extension par le connecteur repasse par un modèle : elle
+# peut recomprimer le centre sans le redessiner, d'où une tolérance faible
+# mais non nulle. Le seuil est PROVISOIRE, à recaler sur les premières
+# extensions réelles ; s'il est dépassé, le modèle a retouché le visuel, ce
+# que la règle 4.2 interdit, et la déclinaison est signalée.
+DIFFERENCE_CENTRE_MAXIMALE = 3.0
+
+
+def _difference_centre(master: Path, decline: Path, hauteur_master: int,
+                       hauteur_decline: int) -> Optional[float]:
+    """La différence moyenne entre le master et le carré central du format."""
+    try:
+        from PIL import Image, ImageChops, ImageStat
+        with Image.open(master) as im_master, Image.open(decline) as im_decline:
+            largeur = im_decline.size[0]
+            haut = (im_decline.size[1] - largeur) // 2
+            centre = im_decline.crop((0, haut, largeur, haut + largeur))
+            a = im_master.convert("L").resize((256, 256), Image.LANCZOS)
+            b = centre.convert("L").resize((256, 256), Image.LANCZOS)
+        return round(ImageStat.Stat(ImageChops.difference(a, b)).mean[0], 2)
+    except Exception:
+        return None
+
+
 def verifier(commande: Commande) -> List[str]:
     """Les trois fichiers d'une créa viennent-ils du même master.
 
     Le contrôle ne fait confiance ni à l'état ni au nom des fichiers : il relit
     l'empreinte du master inscrite au moment de la déclinaison, la recalcule sur
-    le master présent, et mesure la largeur de chaque fichier.
+    le master présent, mesure la largeur de chaque fichier, et compare le carré
+    central de chaque déclinaison au master lui-même. C'est cette dernière
+    mesure qui prouve la règle 4.2 : le même visuel décliné, pas régénéré.
     """
     from PIL import Image
 
@@ -264,6 +381,15 @@ def verifier(commande: Commande) -> List[str]:
             if attendu and abs(hauteur / largeur - attendu) > 0.01:
                 ecarts.append(f"{crea.identifiant} : {nom} fait {largeur}x{hauteur}, "
                               f"ratio {hauteur / largeur:.3f} au lieu de {attendu:.3f}")
+            if nom != FORMAT_MASTER and hauteur > largeur:
+                difference = _difference_centre(commande.dossier / crea.master,
+                                                fichier, 0, 0)
+                if difference is not None and difference > DIFFERENCE_CENTRE_MAXIMALE:
+                    ecarts.append(
+                        f"{crea.identifiant} : le carré central du {nom} s'écarte du "
+                        f"master de {difference} en moyenne par pixel, au-delà de "
+                        f"{DIFFERENCE_CENTRE_MAXIMALE}. Le visuel a été retouché en "
+                        f"chemin, ce que la règle 4.2 interdit.")
         if len(set(largeurs.values())) > 1:
             ecarts.append(f"{crea.identifiant} : les formats n'ont pas la même largeur, "
                           f"{largeurs}")
@@ -282,9 +408,23 @@ def main() -> int:
     p.add_argument("--creas", nargs="+")
     p = sous.add_parser("verifier", help="contrôler que les trois formats se tiennent")
     p.add_argument("ardoise")
+    p = sous.add_parser("ranger-extension",
+                        help="assembler un format produit par le connecteur")
+    p.add_argument("ardoise")
+    p.add_argument("--crea", required=True)
+    p.add_argument("--format", required=True, dest="nom_format",
+                   choices=[n for n in FORMATS if n != FORMAT_MASTER])
+    p.add_argument("--fichier", required=True, type=Path)
     args = analyseur.parse_args()
 
     commande = Commande.charger(args.ardoise)
+
+    if args.action == "ranger-extension":
+        mesure = ranger_extension(commande, args.crea, args.nom_format, args.fichier)
+        print(f"{args.crea} {args.nom_format} : {mesure['largeur']}x{mesure['hauteur']}, "
+              f"bandes {mesure['bande_haut']}/{mesure['bande_bas']} px, "
+              f"{mesure['methode']}.")
+        return 0
 
     if args.action == "verifier":
         ecarts = verifier(commande)

@@ -44,19 +44,22 @@ from empaqueter import _controler, _copier_arbre  # noqa: E402
 MODULES_PORTABLES = (
     "etat.py",          # le modèle de commande, socle de tous les autres
     "zite.py",          # relevé des formulaires, urllib seul
-    "redaction.py",     # le brief moteur
+    "banque.py",        # le registre de lecture de la banque de références
+    "plan.py",          # lit la sortie du skill et la range en créas
     "moteur.py",        # préparation du lot et récolte
     "couts.py",         # la table des coûts mesurés
-    "generation.py",    # le contrat d'appel au modèle
-    "publier.py",       # la livraison, urllib et Pillow
+    "formats.py",       # les trois formats, prolongement et assemblage, Pillow
+    "livrer.py",        # le dossier de remise et la notification
+    "publier.py",       # la plateforme de revue, en option
     "retours.py",       # les retours clients
-    "repertoire.py",    # les archétypes
 )
 
 # Ceux qu'on laisse derrière, et la raison, écrite pour qui ouvrira le paquet.
 ECARTES = {
     "strategie.py": "la stratégie est faite par le skill de Kreative, pas par un script",
-    "composition.py": "dépend du compositeur, qui suppose un texte posé en CSS",
+    "redaction.py": "le skill cartographie lui-même le brief, c'est son étape 1",
+    "generation.py": "doublon de moteur.py, retiré de la chaîne",
+    "repertoire.py": "doctrine créative, sortie de la chaîne le 18/09",
     "scraper.py": "pilote un navigateur Chromium, impossible à installer dans Cowork",
     "audit.py": "appelle un moteur de reconnaissance de caractères, idem",
     "vue.py": "dépend de l'audit écarté",

@@ -372,6 +372,17 @@ def controler(plan: dict, commande: Commande) -> Tuple[List[dict], List[str], Li
             refus.append(f"{etiquette} : prompt vide")
             continue
 
+        # Une créa déjà générée avec CE prompt exact ne se refuse plus pour un
+        # risque d'écriture : la dépense est faite, l'image existe, et c'est
+        # l'audit OCR qui dit si le risque s'est matérialisé. Les contrôles
+        # préventifs ci-dessous ne bloquent que ce qui reste à générer.
+        try:
+            existante = commande.lire_crea(identifiant)
+            deja_generee = bool(existante.master) and \
+                (existante.prompt.scene or "").strip() == prompt
+        except FileNotFoundError:
+            deja_generee = False
+
         # Skill de Kreative, « Règles du prompt » : la phrase de fin est
         # obligatoire, en toute dernière phrase, à ce texte exact.
         if not prompt.rstrip().endswith(PHRASE_DE_FIN):
@@ -384,6 +395,65 @@ def controler(plan: dict, commande: Commande) -> Tuple[List[dict], List[str], Li
         if TIRET_CADRATIN in prompt:
             refus.append(f"{etiquette} : tiret cadratin dans le prompt, interdit par le skill")
             continue
+
+        # La copy déclarée doit être DANS le prompt. Le texte est peint par le
+        # modèle : une copy qui n'apparaît pas dans le prompt ne sera jamais
+        # dans l'image, et l'audit la comptera absente à raison. C'est la
+        # règle de cohérence du skill, « le concept, la liste des assets et le
+        # prompt doivent être parfaitement alignés », appliquée à la copy.
+        # Mesuré le 19/09 : trois créas déclaraient un sous-titre que leur
+        # prompt ne peignait pas, et l'audit les a signalées après 6 crédits
+        # de génération au lieu d'avant.
+        import unicodedata as _ud
+
+        def _mots(texte: str) -> set:
+            plie = _ud.normalize("NFD", texte or "")
+            plie = "".join(c for c in plie if _ud.category(c) != "Mn").lower()
+            return set(re.findall(r"[a-z]{4,}", plie))
+
+        copy_hors_prompt = sorted(
+            (_mots(entree.get("accroche")) | _mots(entree.get("sous_accroche"))
+             | _mots(entree.get("cta")) | _mots(entree.get("badge")))
+            - _mots(prompt))
+        if copy_hors_prompt:
+            refus.append(f"{etiquette} : la copy déclarée porte des mots que le "
+                         f"prompt ne peint pas : {', '.join(copy_hors_prompt[:8])}. "
+                         f"Aligner les champs de copy sur le texte réellement "
+                         f"écrit dans le prompt.")
+            continue
+
+        # Une indication TECHNIQUE collée au texte à peindre finit peinte.
+        # Mesuré trois fois le 19/09 sur un même lot : un bouton portant
+        # « #BE93FA Lire la suite », deux cartes portant « Poppins SemiBold:
+        # vos créas livrées », et un corps de texte en lorem ipsum lisible.
+        # Le modèle ne distingue pas la consigne de rendu du contenu à écrire
+        # quand les deux sont dans la même phrase, juste avant les deux points.
+        #
+        # Ce n'est pas une règle de création : c'est la mécanique d'appel au
+        # modèle, elle nous appartient. Le contrôle ne réécrit rien, il refuse
+        # et montre le passage fautif.
+        faute_technique = None
+        for motif, quoi in (
+            (r"#[0-9A-Fa-f]{6}\s*:", "un code couleur juste avant les deux points"),
+            (r"(?:Poppins|Helvetica|Arial|Inter|Georgia|Roboto)[^:.]{0,30}:",
+             "un nom de police juste avant les deux points"),
+            (r"(?i)lorem\s+ipsum", "la mention lorem ipsum"),
+        ):
+            trouve = re.search(motif, prompt)
+            if trouve:
+                faute_technique = (quoi, trouve.group(0)[:48])
+                break
+        if faute_technique:
+            message = (f"{etiquette} : {faute_technique[0]}, "
+                       f"« {faute_technique[1]} ». Le modèle peut le peindre dans "
+                       f"l'image : écrire la consigne de rendu dans une phrase "
+                       f"séparée du texte à afficher.")
+            if deja_generee:
+                alertes.append(message + " Créa déjà générée avec ce prompt : "
+                               "l'audit OCR tranche, rien n'est regénéré.")
+            else:
+                refus.append(message)
+                continue
 
         # Skill de Kreative, « Gestion des assets », parité stricte : tout asset
         # nommé dans le prompt figure en pièce jointe.
@@ -470,6 +540,13 @@ def importer(ardoise: str, fichier: Path) -> dict:
 
     for entree in recevables:
         crea = commande.lire_crea(entree["id"])
+        # Deux cas de réimport, et ils suivent le 7.2 du cahier des charges.
+        # Le prompt change : l'image ne correspond plus, le master tombe et la
+        # créa repart en génération. Le prompt est inchangé : seuls la copy ou
+        # l'angle bougent, le master validé est conservé tel quel et rien ne
+        # se regénère. Sans cette distinction, corriger une faute de copy
+        # renvoyait tout le pack au modèle, à deux crédits la créa.
+        prompt_change = (crea.prompt.scene or "") != entree["prompt"]
         crea.angle = entree["angle"]
         crea.copy.accroche = entree["accroche"]
         crea.copy.sous_accroche = entree["sous_accroche"]
@@ -478,7 +555,12 @@ def importer(ardoise: str, fichier: Path) -> dict:
         crea.prompt.scene = entree["prompt"]
         crea.prompt.modele = entree["modele"]
         crea.prompt.references = entree["assets"]
-        crea.etat = "briefee"
+        if prompt_change or not crea.master:
+            crea.master = None
+            crea.job_generation = None
+            crea.rendus = {}
+            crea.audit = {}
+            crea.etat = "briefee"
         commande.ecrire_crea(crea)
 
     manque = plan.get("ce_qui_a_manque") or plan.get("carences") or []
