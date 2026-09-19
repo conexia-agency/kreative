@@ -304,7 +304,7 @@ Plus d'angles = plus de tests = plus de chances de trouver un gagnant sans data.
 
 - **Starter** — 6 créas / **3 angles** → 2 créas/angle.
 - **Growth** — 12 créas / **6 angles** → 2 créas/angle.
-- **Scale** — 18 créas / **9 angles** → 2 créas/angle.
+- **Scale** — 24 créas / **12 angles** → 2 créas/angle.
 
 2 créas/angle est le plancher (en dessous, on ne distingue plus « l'angle ne marche pas » de « cette exécution ne marche pas »). Une fois la data récoltée, l'itération suivante décline les gagnants.
 
