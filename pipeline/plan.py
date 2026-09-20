@@ -201,10 +201,31 @@ GUILLEMETS = "«»“”\"'"
 # dans SON fichier : on le lit, on ne le lui reproche pas.
 VIDE = {chr(0x2014), "-", "--", ""}
 
+# Les mots par lesquels le skill dit « ce champ est vide, volontairement ».
+# Son format prescrit le tiret cadratin pour cela ; une session qui respecte
+# l'interdit de ce caractère écrit autre chose : « (délibéré) », « aucun »,
+# « néant ». Tous valent un champ vide, sinon le contrôle de copy exige de
+# peindre le mot « délibéré » dans l'image. Signalé par Kreative le 20/09,
+# sur un CTA volontairement absent.
+MOTS_ABSENCE = {"delibere", "deliberee", "deliberement", "aucun", "aucune",
+                "neant", "rien", "sans", "vide", "non", "na", "nul",
+                "absent", "absente", "volontaire", "volontairement"}
+
+PONCTUATION = re.compile(
+    "[" + re.escape("-*()[]{}.,:;!?\"'/" + chr(0x2013) + chr(0x2014)) + r"\s]+")
+
+
+def _est_absence(valeur: str) -> bool:
+    """Le champ dit-il « rien », sous une forme ou une autre ?"""
+    nu = PONCTUATION.sub(" ", valeur or "").strip()
+    if not nu:
+        return True
+    return {_cle(mot) for mot in nu.split()} <= MOTS_ABSENCE
+
 
 def _nettoyer(valeur: str) -> str:
     valeur = valeur.strip()
-    if valeur in VIDE:
+    if valeur in VIDE or _est_absence(valeur):
         return ""
     return valeur.strip(GUILLEMETS).strip()
 
@@ -271,10 +292,19 @@ def lire_markdown(texte: str, base: Path) -> dict:
             # retire la numérotation avant de reconnaître la section, sinon le
             # bloc des carences repart dans le prompt de la dernière créa.
             titre = _cle(re.sub(r"^[\d.\s)]+", "", depouille.lstrip("#").strip()))
-            dans_manque = titre.startswith("ce qui a manque")
             angle = MOTIF_ANGLE.match(depouille)
+            # TOUT titre ferme la créa en cours, pas seulement un titre
+            # d'angle. Le format de sortie du skill prescrit après les créas
+            # une section « Garde-fous » dont les lignes commencent par
+            # « - Prompt : ... », « - Assets : ... », « - Copy : ... » : sans
+            # cette fermeture, le parseur les lit comme les champs de la
+            # DERNIÈRE créa et les écrase. Signalé par Kreative le 20/09, le
+            # prompt de c24 remplacé par une ligne de checklist. Leur format
+            # n'est pas en cause : c'est au parseur de le suivre.
+            clore()
+            champ_courant = None
+            dans_manque = titre.startswith("ce qui a manque")
             if angle:
-                clore()
                 angle_courant = _nettoyer(angle.group(2)) or f"angle {angle.group(1)}"
             continue
 
