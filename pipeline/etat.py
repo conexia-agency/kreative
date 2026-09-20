@@ -72,12 +72,10 @@ RACINE_DEFAUT = _racine_travail()
 # 4.6 : 6, 12 et 24 créas vendues, et le double généré pour laisser une marge
 # de tri à la réception.
 #
-# **Ses deux documents ne disent pas la même chose, et c'est à lui de
-# trancher.** Son cahier des charges dit Scale = 24 vendues et 48 générées ;
-# son skill du 17/09 dit Scale = 18 créas pour 9 angles. On applique ici le
-# cahier des charges, parce que c'est lui qui décrit ce que le client a acheté,
-# et le skill décrit comment le produire. Si Evan répond l'inverse, c'est cette
-# table qui change, et elle seule.
+# La contradiction entre ses deux documents (CDC : 24 vendues et 48 générées,
+# skill du 17/09 : 18 créas pour 9 angles) a été tranchée par Kreative le
+# 20/09/2026 : leur commit bee9a76 porte le skill à 24 créas pour 12 angles.
+# Les deux documents disent désormais la même chose que cette table.
 #
 # Le facteur porte la surproduction. Il était passé à 1 le 17/09 sur une
 # décision interne qui n'était pas la sienne : sans marge, chaque créa doit
