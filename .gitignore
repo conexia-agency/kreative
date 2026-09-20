@@ -55,3 +55,8 @@ assets/
 exemples/brief-*.json
 !exemples/brief-kreative.json
 tests/fidelite-nano-banana/
+
+# Paquet Cowork : abandonne, le skill de Kreative dit lui-meme qu'il tourne
+# desormais dans Claude Code. Conserve en local pour memoire.
+paquet-cowork/
+outils/empaqueter_cowork.py

@@ -3,7 +3,7 @@
 Chargé au début de chaque session ouverte sur ce dépôt. Vaut pour **toutes les
 commandes**, jamais pour une seule.
 
-## Règle zéro : lire `skill/SKILL.md` EN ENTIER, à chaque commande
+## Règle zéro : lire `skill/strategie-creative.md` EN ENTIER, à chaque commande
 
 **379 lignes, 18 sections, de la première à la dernière.** Pas un survol, pas les
 sections dont on croit se souvenir, pas celles qui semblent utiles sur le moment.

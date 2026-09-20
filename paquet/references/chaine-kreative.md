@@ -99,14 +99,3 @@ La relecture des textes peints se fait sur les découpes de
 une zone par image, toute la résolution pour chacune. La créa entière sert
 à juger la composition ; les zones servent à lire les lettres.
 
-## 5. Ce qui change dans Cowork
-
-Cowork exécute du Python mais ne peut pas installer de logiciel pendant qu'il
-travaille. L'analyse du site, que la version technique confie à un script, s'y
-fait donc avec le navigateur de Cowork, en enregistrant les résultats aux
-emplacements du tableau ci-dessus. La relecture des visuels s'y fait à l'oeil,
-ce qui est un gain : un moteur de reconnaissance de caractères échoue sur un
-texte incliné ou peint en couleur vive, là où l'oeil lit correctement.
-
-Le skill décrit déjà cette analyse et les outils de navigateur à employer :
-c'est lui qui fait foi.

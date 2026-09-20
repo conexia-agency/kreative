@@ -93,7 +93,7 @@ dans `~/Kreative/commandes/` ; pour choisir un autre endroit, poser
 
 Ouvrir une session Claude Code dans le dépôt : le `CLAUDE.md` se charge et
 porte les consignes de session, à commencer par la règle zéro, lire
-`skill/SKILL.md` EN ENTIER. L'ordre d'une commande est celui de
+`skill/strategie-creative.md` EN ENTIER. L'ordre d'une commande est celui de
 `paquet/SKILL.md` (section Workflow) :
 
 1. `pipeline/zite.py relever` puis `--appliquer` : le formulaire devient un
@@ -103,7 +103,7 @@ porte les consignes de session, à commencer par la règle zéro, lire
    Meta se tente à chaque commande.
 3. `pipeline/banque.py ouvrir / lue / retenir / extraire` : la banque de
    références, sous registre. Ouvrir chaque fichier extrait un par un.
-4. La stratégie, selon `skill/SKILL.md`, écrite dans UN fichier markdown,
+4. La stratégie, selon `skill/strategie-creative.md`, écrite dans UN fichier markdown,
    puis `pipeline/plan.py importer <ardoise> --fichier <plan.md>`.
 5. `pipeline/moteur.py preparer <ardoise>` : le devis, puis la génération
    par le MCP, puis `recolter`.

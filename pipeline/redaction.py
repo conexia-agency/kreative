@@ -45,14 +45,14 @@ from etat import Commande  # noqa: E402
 def _fichier_skill() -> Path:
     """Le skill de stratégie, aux deux emplacements possibles.
 
-    Dépôt de développement : `skill/SKILL.md`. Skill installé (dossier
+    Dépôt de développement : `skill/strategie-creative.md`. Skill installé (dossier
     empaqueté) : `references/strategie-creative.md`. Le premier trouvé gagne ;
     aucun des deux n'est une erreur silencieuse, l'appelant échoue en clair.
     """
     # RACINE est le dossier du code. Dans le dépôt de développement, le skill
     # de stratégie vit dans skill/. Dans le paquet installé, le code est dans
     # scripts/ et le skill dans references/, un niveau au-dessus.
-    for chemin in (RACINE / "skill" / "SKILL.md",
+    for chemin in (RACINE / "skill" / "strategie-creative.md",
                    RACINE / "skill" / "strategie-creative-SKILL.md",
                    RACINE / "references" / "strategie-creative.md",
                    RACINE.parent / "references" / "strategie-creative.md",
@@ -63,7 +63,7 @@ def _fichier_skill() -> Path:
         if chemin.is_file():
             return chemin
     raise FileNotFoundError(
-        "skill de stratégie introuvable : ni skill/SKILL.md, ni "
+        "skill de stratégie introuvable : ni skill/strategie-creative.md, ni "
         "references/strategie-creative.md à côté du code")
 
 

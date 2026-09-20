@@ -12,7 +12,7 @@ Ce qui part, et rien d'autre :
 
     SKILL.md, CHANGELOG.md, evals/        depuis paquet/
     references/installation.md, architecture.md
-    references/strategie-creative.md      depuis skill/SKILL.md, INTACT
+    references/strategie-creative.md      depuis skill/strategie-creative.md, INTACT
     CREAS INSPI DELIVERY/                 depuis skill/, la banque telle quelle
     scripts/kreative.py, orchestrateur.py, pipeline/, outils/
 
@@ -177,16 +177,12 @@ def empaqueter(vers: Path, faire_zip: bool) -> int:
     total += _copier_arbre(DEPOT / "paquet", vers)
     # 2. Le métier créatif.
     (vers / "references").mkdir(exist_ok=True)
-    shutil.copy2(DEPOT / "skill" / "SKILL.md",
+    shutil.copy2(DEPOT / "skill" / "strategie-creative.md",
                  vers / "references" / "strategie-creative.md")
     total += 1
     # Le skill du client part intact ; ce qu'il demande d'aller chercher est déjà
     # sur le disque quand la chaîne tourne, et c'est ce fichier qui le dit. Sans
     # lui, la session relirait le site au navigateur alors que le scraper l'a fait.
-    chaine = DEPOT / "paquet-cowork" / "chaine-kreative.md"
-    if chaine.exists():
-        shutil.copy2(chaine, vers / "references" / "chaine-kreative.md")
-        total += 1
     # 3. La banque, telle quelle.
     total += _copier_arbre(DEPOT / "skill" / "CREAS INSPI DELIVERY",
                            vers / "CREAS INSPI DELIVERY")

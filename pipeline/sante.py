@@ -39,8 +39,8 @@ OK, MANQUE, OPTION, SESSION = "ok     ", "MANQUE ", "option ", "session"
 def _environnement() -> tuple[str, Path]:
     """Quel environnement, et où vit le fichier du skill créatif."""
     racine = ICI.parent
-    if (racine / "outils" / "empaqueter.py").exists() and (racine / "skill" / "SKILL.md").exists():
-        return "dépôt de développement", racine / "skill" / "SKILL.md"
+    if (racine / "outils" / "empaqueter.py").exists() and (racine / "skill" / "strategie-creative.md").exists():
+        return "dépôt de développement", racine / "skill" / "strategie-creative.md"
     # Dans un paquet assemblé, le code vit sous scripts/ : le skill se cherche
     # au niveau du script ET au niveau du paquet.
     for base in (racine, racine.parent):
@@ -69,7 +69,7 @@ def controler() -> int:
     elif chemin_skill.exists():
         note(MANQUE, "skill créatif", f"{chemin_skill} fait {chemin_skill.stat().st_size} octets : tronqué. Réassembler le paquet.")
     else:
-        note(MANQUE, "skill créatif", f"introuvable ({chemin_skill}). Dans le dépôt : skill/SKILL.md. Dans un paquet : references/ ou resources/strategie-creative.md, injecté par outils/empaqueter.py.")
+        note(MANQUE, "skill créatif", f"introuvable ({chemin_skill}). Dans le dépôt : skill/strategie-creative.md. Dans un paquet : references/ ou resources/strategie-creative.md, injecté par outils/empaqueter.py.")
 
     # 2. La banque de références, par le même résolveur que la chaîne.
     try:
