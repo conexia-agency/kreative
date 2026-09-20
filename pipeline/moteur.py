@@ -136,8 +136,9 @@ def preparer(commande: Commande, filtre: Optional[List[str]] = None,
     if manquements:
         raise RuntimeError(
             "GÉNÉRATION REFUSÉE, banque de références : "
-            + " · ".join(manquements)
-            + ". Reprendre banque.py ouvrir / lue / retenir, puis relancer preparer.")
+            + " · ".join(m.rstrip(".") for m in manquements)
+            + ". Reprendre banque.py ouvrir / lue / retenir / extraire, "
+              "puis relancer preparer.")
 
     jobs = []
     for crea in creas:

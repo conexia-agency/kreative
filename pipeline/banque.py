@@ -382,6 +382,21 @@ def verifier(commande: Commande, refs_du_plan: Optional[List[str]] = None) -> Li
         fautes.append(f"{len(retenues)} reference(s) retenue(s) pour un plancher de "
                       f"{plancher} sur ce volume de pack")
 
+    # Les fichiers d'extraire, preuve que la pleine resolution a ete produite.
+    # Declarer une reference retenue ne coute rien ; le fichier decoupe sur le
+    # disque, lui, ne peut pas etre coche : il existe ou il n'existe pas.
+    # C'est le seul cran de plus qu'un controle mecanique peut serrer, la
+    # lecture des images reste un acte de la session.
+    if retenues:
+        dossier_extraits = commande.dossier / "session" / "references"
+        sans_fichier = sorted(r for r in retenues
+                              if not (dossier_extraits / f"{r}.jpg").exists())
+        if sans_fichier:
+            fautes.append(f"{len(sans_fichier)} reference(s) retenue(s) sans fichier "
+                          f"pleine resolution sur le disque : {', '.join(sans_fichier)}. "
+                          f"Lancer banque.py extraire, puis OUVRIR chaque fichier de "
+                          f"session/references/ un par un avant d'ecrire le plan.")
+
     du_client = set(etat.get("references_du_client") or [])
     reprises = sorted(retenues & du_client)
     if reprises:
