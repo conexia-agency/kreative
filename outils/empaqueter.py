@@ -77,6 +77,27 @@ def _doublon_icloud(chemin: Path) -> bool:
     return any(re.search(r" \d+$", Path(part).stem) for part in chemin.parts)
 
 
+def purger_doublons_icloud(dossier: Path) -> int:
+    """Supprime les copies de conflit iCloud DANS un paquet assemblé.
+
+    Le rmtree d'ouverture ne suffit pas : le Bureau est synchronisé iCloud,
+    qui redépose ses vieilles versions en conflit APRÈS l'assemblage
+    (« skill 3.md », « scripts 3 », mesuré le 19/09 : des arbres entiers
+    dupliqués, datés d'un build précédent). Deux fichiers skill dans un
+    paquet, c'est une session qui peut charger le vieux. À appeler en fin
+    d'assemblage, et à recommander avant tout envoi.
+    """
+    import re
+    n = 0
+    for element in sorted(dossier.rglob("*"), key=lambda p: -len(p.parts)):
+        if re.search(r" \d+$", element.stem):
+            shutil.rmtree(element, ignore_errors=True) if element.is_dir() else element.unlink(missing_ok=True)
+            n += 1
+    if n:
+        print(f"  {n} copie(s) de conflit iCloud purgée(s) de {dossier.name}")
+    return n
+
+
 def _copier_arbre(source: Path, cible: Path) -> int:
     n = 0
     for element in sorted(source.rglob("*")):
@@ -181,6 +202,7 @@ def empaqueter(vers: Path, faire_zip: bool) -> int:
     for dossier in ("pipeline", "outils"):
         total += _copier_arbre(DEPOT / dossier, scripts / dossier)
 
+    purger_doublons_icloud(vers)
     fautes = _controler(vers)
     if fautes:
         print("EMPAQUETAGE REFUSÉ :")

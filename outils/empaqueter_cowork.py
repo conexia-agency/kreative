@@ -38,7 +38,7 @@ from pathlib import Path
 DEPOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(DEPOT / "outils"))
 
-from empaqueter import _controler, _copier_arbre  # noqa: E402
+from empaqueter import _controler, _copier_arbre, purger_doublons_icloud  # noqa: E402
 
 # Les modules qui tournent dans Cowork : Python pur, aucune dépendance système.
 MODULES_PORTABLES = (
@@ -135,6 +135,7 @@ def empaqueter(vers: Path, faire_zip: bool) -> int:
     total += 1
 
     fautes = _controler(vers)
+    purger_doublons_icloud(vers)
     if fautes:
         print("EMPAQUETAGE REFUSÉ :")
         for f in fautes:

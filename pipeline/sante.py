@@ -171,7 +171,29 @@ def controler() -> int:
         else:
             note(MANQUE, "connecteur Higgsfield", "non déclaré : la génération est impossible. L'ajouter (installation.md, section 2) : claude mcp add --transport http --scope user higgsfield https://mcp.higgsfield.ai/mcp, puis redémarrer Claude Code et laisser l'OAuth s'ouvrir dans le navigateur au premier appel. Jamais la CLI higgsfield : le MCP seul.")
 
-    # 9. Ce qui ne se prouve qu'en session.
+    # 9. Les copies de conflit iCloud. Un dossier synchronisé (le Bureau, les
+    # Documents) redépose de vieilles versions sous « nom 2.md », « scripts 3 »,
+    # y compris APRÈS un assemblage propre : mesuré le 19/09, des arbres
+    # entiers dupliqués dans les deux paquets. Deux fichiers skill côte à
+    # côte, c'est une session qui peut charger le vieux : bloquant.
+    import re as _re
+    racine_env = chemin_skill.parent if env != "dépôt de développement" else ICI.parent
+    # Seuls comptent les dossiers que la chaîne LIT : un doublon dans un
+    # dossier ignoré ou de données ne trompe personne.
+    IGNORES = {".git", ".codegraph", "commandes", "inspirations-sources",
+               "inspirations", "corpus", "sources", "_ecarte-de-leur-skill"}
+    doublons = [str(p.relative_to(racine_env)) for p in racine_env.rglob("*")
+                if _re.search(r" \d+$", p.stem) and not IGNORES & set(p.parts)]
+    if doublons:
+        note(MANQUE, "copies de conflit iCloud", f"{len(doublons)} élément(s) en double, "
+             f"vieilles versions redéposées par la synchronisation : "
+             f"{', '.join(doublons[:5])}{'…' if len(doublons) > 5 else ''}. "
+             f"Les supprimer (ce sont des copies périmées), ou réassembler le paquet : "
+             f"l'empaquetage les purge désormais.")
+    else:
+        note(OK, "copies de conflit iCloud", "aucune")
+
+    # 10. Ce qui ne se prouve qu'en session.
     note(SESSION, "génération", "un appel de solde (balance) en session prouve le connecteur autorisé et le compte crédité, avant toute dépense.")
     note(SESSION, "navigateur", "exigé par le skill pour l'analyse du site ; en chaîne, scraper.py ou le navigateur de la session s'en charge. C'est aussi lui qui porte l'OAuth du connecteur au premier appel.")
 

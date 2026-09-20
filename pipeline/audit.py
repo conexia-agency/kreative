@@ -33,9 +33,9 @@ tranché, `audit.py` rapporte et rend 0. `--bloquant` rend 1 sur échec, pour le
 jour où la réponse sera oui.
 
 Usage :
-    python3 audit.py --marque "Tahiti Premium Water"
-    python3 audit.py --marque "Tahiti Premium Water" --bloquant
-    python3 audit.py --marque "Tahiti Premium Water" --json
+    python3 audit.py --marque "Marque Exemple"
+    python3 audit.py --marque "Marque Exemple" --bloquant
+    python3 audit.py --marque "Marque Exemple" --json
 
 Cible Python 3.9+. Dépendances : Pillow. Tesseract pour C1, optionnel.
 """

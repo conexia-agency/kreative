@@ -9,7 +9,7 @@ La veille concurrentielle est hors périmètre, elle passe en phase 2.
 ```bash
 cd kreative
 
-python3 kreative.py brief exemples/brief-tpw.json     # commande + plan complet
+python3 kreative.py brief exemples/brief-kreative.json     # commande + plan complet
 python3 kreative.py prompts tahiti-premium-water      # voir tous les prompts
 python3 kreative.py generer tahiti-premium-water      # tout générer, en un appel
 python3 kreative.py composer tahiti-premium-water     # les 3 formats
@@ -46,7 +46,7 @@ Mesuré sur le corpus : 91 créas sur 120 ne demandent aucun appel à un modèle
 d'image. Chaque archétype porte donc son mode de fabrication, et
 `generer` ne prend que ceux qui en ont un.
 
-Sur le brief Tahiti Premium Water : 11 créas composées, 1 générée, 2 crédits
+Sur le brief d'exemple : 11 créas composées, 1 générée, 2 crédits
 pour le pack entier. Sur le brief Aloa Design, verticale agence : 12 composées,
 0 crédit, ce qui est conforme au corpus où 23 créas d'agence sur 23 sont
 composées.

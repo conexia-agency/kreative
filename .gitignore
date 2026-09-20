@@ -45,3 +45,13 @@ venv/
 
 # macOS
 .DS_Store
+
+# Hors systeme : jamais dans le depot public (docs business, matiere Conexia,
+# doctrine ecartee). Conserves en local seulement.
+sources/
+_ecarte-de-leur-skill/
+tests/aloa-design/
+assets/
+exemples/brief-*.json
+!exemples/brief-kreative.json
+tests/fidelite-nano-banana/

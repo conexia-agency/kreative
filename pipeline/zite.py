@@ -26,7 +26,7 @@ paragraphe. La mise en forme courte que réclame le moteur (promesse, CTA, doule
 en groupes nominaux) est l'affaire de l'étape suivante, pas d'un mappage.
 
 **On ne touche jamais un dossier existant.** Les dossiers d'avant la convention
-(atclub, podmax, turnly) portent le même nom que leurs soumissions Zite. Écrire
+des tests portent le même nom que leurs soumissions Zite. Écrire
 dedans mélangerait un état neuf à des rendus déjà livrés. Une soumission dont le
 dossier existe part en attente, visible, et n'est pas produite.
 

@@ -1,6 +1,6 @@
 # Deux moteurs Higgsfield, deux methodes
 
-Releve du 2026-09-08, mesure en direct sur le lot ATCLUB (8 creas Nano Banana Pro
+Releve du 2026-09-08, mesure en direct sur un lot de test (8 creas Nano Banana Pro
 puis 1 crea MS Image). Tout ce qui suit est verifie par la CLI, rien n'est estime.
 
 ## Qui est qui
@@ -39,7 +39,7 @@ Quatre causes, dans l'ordre d'importance.
    conventions du format avant de generer. Sur Nano Banana Pro, le texte part tel quel.
 3. **Le prompt doit etre COURT.** ~700 caracteres suffisent : sur-specifier bride le preset.
    Sur Nano Banana Pro c'est l'inverse, il faut tout decrire (lumiere, matiere, ombres,
-   profondeur), sinon le rendu est plat. Les 8 creas ATCLUB faisaient 1 800 a 2 400 caracteres
+   profondeur), sinon le rendu est plat. Les 8 creas du lot de test faisaient 1 800 a 2 400 caracteres
    et sont sorties conformes mais convenues.
 4. **Le brand kit** injecte nom, palette et univers sans les repeter dans le prompt.
 
@@ -50,12 +50,12 @@ comme la crea MS Image comparee.
 
 ### MS Image
 - **Il invente les ecrans de produit**, meme avec la vraie capture passee en `--media`.
-  Sur ATCLUB il a fabrique une interface complete avec des chiffres credibles et faux :
+  Sur ce lot il a fabrique une interface complete avec des chiffres credibles et faux :
   « Tennis 1 250 joueurs », « Padel 980 joueurs », « Running 2 430 coureurs ». **Plus dangereux
   que du charabia** : ca passe la relecture et part en diffusion.
 - **Il glisse vers le registre sexualise** des qu'on lui laisse la scene avec un humain,
   meme quand le brief l'interdit. Curseur a tenir explicitement dans le prompt.
-- **Il fait apparaitre des marques tierces reelles** (un sac Wilson sur le rendu ATCLUB).
+- **Il fait apparaitre des marques tierces reelles** (un sac Wilson sur un rendu du lot de test).
 - Le brand kit produit une **tagline en anglais** meme sur un site francais : forcer le
   francais dans le prompt.
 
@@ -75,10 +75,10 @@ comme la crea MS Image comparee.
 ## La banque Marketing Studio, enumeree le 2026-09-08
 
 40 avatars preset · 9 hooks · 14 settings · **42 formats d'annonce** · 0 brand kit avant
-celui d'AtClub · 1 produit deja enregistre (une HOKA Clifton 10 scrapee sur intersport.pf).
+celui du lot de test · 1 produit deja enregistre (une chaussure scrapee sur un site marchand).
 
 Le brand kit ne se cree **que** par `brand-kits fetch --url`, pas manuellement, et le logo
-qu'il extrait peut etre faux : pour AtClub il a pris le rectangle de degrade du site.
+qu'il extrait peut etre faux : pour le lot de test il a pris le rectangle de degrade du site.
 
 ## Les deux appels, litteralement
 

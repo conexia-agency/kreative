@@ -81,7 +81,7 @@ class Tarif:
         self.note = note
 
 
-# Relevés des 2026-09-08 (lot ATCLUB, mesure en direct) et 2026-09-11, sur le
+# Relevés des 2026-09-08 (lot de test, mesure en direct) et 2026-09-11, sur le
 # compte Conexia en plan ultra. Les modèles absents de cette table ne sont pas
 # gratuits : ils ne sont pas mesurés.
 TARIFS: Dict[str, Tarif] = {

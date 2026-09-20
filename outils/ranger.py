@@ -8,9 +8,9 @@ Trois commandes.
 
     python3 outils/ranger.py creer --marque "Les Bains de Dax" \
         --url https://exemple.fr --pack starter
-    python3 outils/ranger.py migrer atclub
+    python3 outils/ranger.py migrer <ardoise>
     python3 outils/ranger.py verifier            # tous les dossiers
-    python3 outils/ranger.py verifier atclub     # un seul
+    python3 outils/ranger.py verifier <ardoise>     # un seul
 
 **La migration copie, elle ne déplace jamais.** L'ancien dossier reste intact
 et l'ancienne forme n'est pas supprimée : effacer est une décision humaine, prise
@@ -264,7 +264,7 @@ def verifier(nom: Optional[str] = None, racine: Path = RACINE_DEFAUT) -> List[di
             # surproduction a fait passer le facteur de 2 à 1, et les 22
             # commandes ouvertes se sont mises à signaler un écart d'un seul
             # coup, alors qu'aucune n'avait bougé : elles étaient justes sous la
-            # règle de leur création, et tpw-growth a bien ses 24 créas sur le
+            # règle de leur création, et le lot de test a bien ses 24 créas sur le
             # disque. Un contrôle qui condamne tout le passé à chaque changement
             # de règle apprend à ignorer les alertes.
             #

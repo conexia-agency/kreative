@@ -5,7 +5,7 @@ conforme, pas l'inverse. Si une règle d'ici gêne le code, on change la règle
 ici d'abord, en disant pourquoi.
 
 Motif de son existence : au 11/09/2026 deux conventions coexistaient dans
-`commandes/`. `atclub` portait `brief.md`, `ETAT.md`, `out/`, `out-v2/`,
+`commandes/`. Une vieille commande portait `brief.md`, `ETAT.md`, `out/`, `out-v2/`,
 `out-v3/`, `creas/`, `creas-v2/`, `creas-v3/`, `refs/`. `kreative` portait
 `commande.json`, `journal.jsonl`, `suivi.html`, `masters/`, `dist/`. Aucun
 script ne pouvait lire les deux, et les suffixes `-v2` et `-v3` étaient des
